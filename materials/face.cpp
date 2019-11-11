@@ -90,6 +90,12 @@ vector<Rect> getTruths(int index) {
 	gTs[2].push_back(Rect(412, 123, 122, 122));
 	gTs[3].push_back(Rect(461, 216, 103, 103));
 	gTs[3].push_back(Rect(726, 189, 100, 100));
+	for (int j = 0; j < gTs[index].size(); j++) { //Expanding ground truth rect so detected can be seen
+		gTs[index][j].x -= 4;
+		gTs[index][j].y -= 4;
+		gTs[index][j].width += 8;
+		gTs[index][j].height += 8;
+	}
 	//Maybe we'll add further gTs for dart 15
 	return gTs[index];
 }
@@ -106,6 +112,7 @@ void detectAndDisplay( Mat frame , vector<Rect> gt)
 	std::vector<Rect> faces;
 	Mat frame_gray;
 	int truePos = 0;
+	int faceCount = gt.size();
 
 	// 1. Prepare Image by turning it into Grayscale and normalising lighting
 	cvtColor( frame, frame_gray, CV_BGR2GRAY );
@@ -124,6 +131,7 @@ void detectAndDisplay( Mat frame , vector<Rect> gt)
 		rectangle(frame, Point(faces[i].x, faces[i].y), Point(faces[i].x + faces[i].width, faces[i].y + faces[i].height), Scalar( 0, 255, 0 ), 2);
 		for (int j = 0; j < gt.size(); j++) {
 			if (rectIntersect(faces[i], gt[j], 0.75)) {
+				gt.erase(gt.begin() + j);
 				matchFlag = true;
 				break;
 			}
@@ -134,6 +142,10 @@ void detectAndDisplay( Mat frame , vector<Rect> gt)
 		}
 		else cout << "Detected face " << i+1 << " " << faces[i]  << "doesn't match a ground truth face" << endl;
 	}
-	cout << truePos << " faces out of " << gt.size() << " detected correctly." << endl;
-	cout << "True positive rate = " <<  (gt.size() > 0 ? (float) truePos/gt.size() : 1) << endl;
+	float precision = (float) truePos/ faces.size();
+	float recall = (faceCount > 0 ? (float) truePos/faceCount : 1);
+	float f1 = 2 * ((precision * recall) / (precision + recall));
+	cout << truePos << " faces out of " << faceCount << " detected correctly." << endl;
+	cout << "True positive rate = " <<  recall << endl;
+	cout << "F1 score = " << f1 << endl;
 }
