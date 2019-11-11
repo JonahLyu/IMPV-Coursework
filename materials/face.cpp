@@ -142,9 +142,9 @@ void detectAndDisplay( Mat frame , vector<Rect> gt)
 		}
 		else cout << "Detected face " << i+1 << " " << faces[i]  << "doesn't match a ground truth face" << endl;
 	}
-	float precision = (float) truePos/ faces.size();
-	float recall = (faceCount > 0 ? (float) truePos/faceCount : 1);
-	float f1 = 2 * ((precision * recall) / (precision + recall));
+	float precision = (float) truePos/ faces.size(); //ratio of faces found correctly, to faces detected in image
+	float recall = (faceCount > 0 ? (float) truePos/faceCount : 1); //True positive rate
+	float f1 = 2 * ((precision * recall) / (precision + recall)); //Measure of accuracy of classifier
 	cout << truePos << " faces out of " << faceCount << " detected correctly." << endl;
 	cout << "True positive rate = " <<  recall << endl;
 	cout << "F1 score = " << f1 << endl;
