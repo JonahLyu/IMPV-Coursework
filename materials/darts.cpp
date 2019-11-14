@@ -66,7 +66,7 @@ int main( int argc, const char** argv )
 
 // }
 
-//Speicifc function to pull file number out of files following format xN.jpg where x is a string an N is an integer
+//Specifc function to pull file number out of files following format xN.jpg where x is a string an N is an integer
 int pullNum(const char* name) {
 	int num = 0;
 	int unit = 1;
@@ -160,7 +160,7 @@ void detectAndDisplay( Mat frame , vector<Rect> gt)
 	std::cout << darts.size() << std::endl;
 
        // 4. Draw box around faces found
-	for( int i = 0; i < darts.size() && gt.size() > 0; i++ ) //Exit loop early when all ground truths seen
+	for( int i = 0; i < darts.size(); i++ ) //Exit loop early when all ground truths seen
 	{
 		bool matchFlag = false;
 		rectangle(frame, Point(darts[i].x, darts[i].y), Point(darts[i].x + darts[i].width, darts[i].y + darts[i].height), Scalar( 0, 255, 0 ), 2);
