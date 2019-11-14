@@ -6,12 +6,39 @@
 #include <math.h>    //depending on your machine setup
 
 using namespace cv;
+using namespace std;
 
 void conv(
 	cv::Mat &input,
 	Mat kernel,
 	cv::Mat &blurredOutput);
 void min_Max(Mat &input, double &low, double&high);
+
+long ***suppress(long*** hspace, float bound, int cols, int rows, int rad, int suppRange) {
+	if (bound > 1) {
+		cout << "bound needs to be 1 or less" << endl;
+		return hspace;
+	}
+	double max;
+	int maxIdx[3];
+	int dims[3] = {rows, cols, rad};
+	Mat hMat = Mat(3, dims, CV_64F, hspace);
+	minMaxIdx(hMat, NULL, &max, NULL, maxIdx);
+	double loopMax = max;
+	while (loopMax > bound * max) {
+		for (int j = maxIdx[1] - suppRange; j > 0 && j < rows && j < maxIdx[0] + suppRange; j++) {
+			for (int i = maxIdx[0] - suppRange; i > 0 && i < cols && i < maxIdx[1] + suppRange; i++) {
+				for (int r = maxIdx[2] - suppRange; r > 0 && r < rad && r < maxIdx[2] + suppRange; r++) {
+					hMat.at<long>(j,i,r) = 0;
+					cout << "t" << endl;
+				}
+			}
+		}
+		// hMat = Mat(3, dims, CV_64F, hspace);
+		minMaxIdx(hMat, NULL, &loopMax, NULL, maxIdx);
+	}
+	return hspace;	
+}
 
 long ***malloc3dArray(int dim1, int dim2, int dim3)
 {
@@ -164,6 +191,12 @@ int main( int argc, char** argv )
   cv::Mat kernel_dy = Mat(3, 3, CV_64F, dy);
  // cv::Mat kernel = (Mat_<double>(3,3) << 1, 1, 1, 1, 1, 1, 1, 1, 1);
 
+//  Mat kx = cv::getGaussianKernel(3, -1);
+//  Mat ky = cv::getGaussianKernel(3, -1);
+//  Mat blur = kx + ky.t();
+
+//  conv(gray_image, blur, gray_image);
+
  Mat output_dx;
  Mat output_dx_norm;
  conv(gray_image,kernel_dx,output_dx);
@@ -192,15 +225,16 @@ Mat output_dy_norm;
 //part 2, hough
 
 Mat output_thresholded;
-thresholding(60, output_mag_norm, output_thresholded);
+thresholding(40, output_mag_norm, output_thresholded);
 imwrite( "output_thresholded.jpg", output_thresholded );
 
-long ***hspace;
-int radius = 60;
-hspace = hough(output_thresholded, output_ang, radius);
+long ***hspace; //Want to change this to mat all the way through
+int radius = 50;
+hspace = hough(output_thresholded, output_ang, radius); //Have create 3d hough mat
 Mat ouput_hough;
 ouput_hough.create(output_ang.size(), output_ang.type());
-houghToMat(hspace, ouput_hough, radius);
+suppress(hspace, 0.8, output_ang.cols, output_ang.rows, radius, 30); //Suppress 3d hough mat
+houghToMat(hspace, ouput_hough, radius); //Take 3d hough mat to 2d hough mat
 
 Mat ouput_hough_norm;
 normalize(ouput_hough, ouput_hough_norm, 0, 255, NORM_MINMAX);
@@ -209,7 +243,7 @@ imwrite( "output_hough.jpg", ouput_hough_norm);
 
 Mat output_circles;
 output_circles.create(output_ang.size(), output_ang.type());
-circleHighlight(hspace, output_mag_norm, 15, radius);
+circleHighlight(hspace, output_mag_norm, 18, radius);
 imwrite( "output_circles.jpg", output_mag_norm);
 
  return 0;
