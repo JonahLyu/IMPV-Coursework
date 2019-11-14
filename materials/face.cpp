@@ -145,6 +145,7 @@ void detectAndDisplay( Mat frame , vector<Rect> gt)
 	float precision = (float) truePos/ faces.size(); //ratio of faces found correctly, to faces detected in image
 	float recall = (faceCount > 0 ? (float) truePos/faceCount : 1); //True positive rate
 	float f1 = 2 * ((precision * recall) / (precision + recall)); //Measure of accuracy of classifier
+	f1 = (f1 != f1) ? 0 : f1; //f1 != f1 is true if f1 is NaN, as long as -ffast-math compiler flag not used
 	cout << truePos << " faces out of " << faceCount << " detected correctly." << endl;
 	cout << "True positive rate = " <<  recall << endl;
 	cout << "F1 score = " << f1 << endl;
