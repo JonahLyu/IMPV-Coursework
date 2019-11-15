@@ -35,8 +35,9 @@ void suppress(Mat &hspace, double bound, int cols, int rows, int rad, int suppRa
 	minMaxIdx(hspace, NULL, NULL, NULL, maxIdx);
 	double max = hspace.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]);
 	double loopMax = max;
-	out.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]) = loopMax;
+	// out.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]) = loopMax;
 	while (loopMax > bound * max) {
+		out.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]) = loopMax;
 		for (int j = maxIdx[0] - suppRange; j < rows && j < maxIdx[0] + suppRange; j++) {
 			for (int i = maxIdx[1] - suppRange; i < cols && i < maxIdx[1] + suppRange; i++) {
 				for (int r = maxIdx[2] - suppRange; r < rad && r < maxIdx[2] + suppRange; r++) {
@@ -50,7 +51,6 @@ void suppress(Mat &hspace, double bound, int cols, int rows, int rad, int suppRa
 		// hMat = Mat(3, dims, CV_64F, hspace);
 		minMaxIdx(hspace, NULL, NULL, NULL, maxIdx);
 		loopMax = hspace.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]);
-		out.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]) = loopMax;
 	}	
 }
 
@@ -233,7 +233,7 @@ Mat output_dy_norm;
 //part 2, hough
 
 Mat output_thresholded;
-thresholding(50, output_mag_norm, output_thresholded);
+thresholding(40, output_mag_norm, output_thresholded);
 imwrite( "output_thresholded.jpg", output_thresholded );
 
 // long ***hspace; //Want to change this to mat all the way through
@@ -245,7 +245,7 @@ hough(output_thresholded, output_ang, radius, hspace); //Have create 3d hough ma
 Mat output_hough;
 output_hough.create(output_ang.size(), output_ang.type());
 Mat supH;
-suppress(hspace, 0.8, output_ang.cols, output_ang.rows, radius, 50, supH); //Suppress 3d hough mat
+suppress(hspace, 0.4, output_ang.cols, output_ang.rows, radius, 50, supH); //Suppress 3d hough mat
 houghToMat(supH, output_hough, radius); //Take 3d hough mat to 2d hough mat
 Mat output_hough_norm;
 normalize(output_hough, output_hough_norm, 0, 255, NORM_MINMAX);
