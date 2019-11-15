@@ -8,36 +8,50 @@
 using namespace cv;
 using namespace std;
 
+void zeroHspace(Mat &hspace, int *dims) {
+	for (int y = 0; y < dims[0]; y++) {
+		for (int x = 0; x < dims[1]; x++) {
+			for (int r = 0; r < dims[2]; r++) {
+				hspace.at<double>(y, x, r) = 0;
+			}
+		}
+	}
+}
+
 void conv(
 	cv::Mat &input,
 	Mat kernel,
 	cv::Mat &blurredOutput);
 void min_Max(Mat &input, double &low, double&high);
 
-long ***suppress(long*** hspace, float bound, int cols, int rows, int rad, int suppRange) {
+void suppress(Mat &hspace, double bound, int cols, int rows, int rad, int suppRange, Mat &out) {
+	int dims[3] = {rows, cols, rad};
+	out = Mat(3, dims, CV_64F);
 	if (bound > 1) {
 		cout << "bound needs to be 1 or less" << endl;
-		return hspace;
+		return;
 	}
-	double max;
 	int maxIdx[3];
-	int dims[3] = {rows, cols, rad};
-	Mat hMat = Mat(3, dims, CV_64F, hspace);
-	minMaxIdx(hMat, NULL, &max, NULL, maxIdx);
+	minMaxIdx(hspace, NULL, NULL, NULL, maxIdx);
+	double max = hspace.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]);
 	double loopMax = max;
+	out.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]) = loopMax;
 	while (loopMax > bound * max) {
-		for (int j = maxIdx[1] - suppRange; j > 0 && j < rows && j < maxIdx[0] + suppRange; j++) {
-			for (int i = maxIdx[0] - suppRange; i > 0 && i < cols && i < maxIdx[1] + suppRange; i++) {
-				for (int r = maxIdx[2] - suppRange; r > 0 && r < rad && r < maxIdx[2] + suppRange; r++) {
-					hMat.at<long>(j,i,r) = 0;
-					cout << "t" << endl;
+		for (int j = maxIdx[0] - suppRange; j < rows && j < maxIdx[0] + suppRange; j++) {
+			for (int i = maxIdx[1] - suppRange; i < cols && i < maxIdx[1] + suppRange; i++) {
+				for (int r = maxIdx[2] - suppRange; r < rad && r < maxIdx[2] + suppRange; r++) {
+					if (j < 0) j = 0;
+					if (i < 0) i = 0;
+					if (r < 0) r = 0;
+					hspace.at<long>(j,i,r) = 0;
 				}
 			}
 		}
 		// hMat = Mat(3, dims, CV_64F, hspace);
-		minMaxIdx(hMat, NULL, &loopMax, NULL, maxIdx);
-	}
-	return hspace;	
+		minMaxIdx(hspace, NULL, NULL, NULL, maxIdx);
+		loopMax = hspace.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]);
+		out.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]) = loopMax;
+	}	
 }
 
 long ***malloc3dArray(int dim1, int dim2, int dim3)
@@ -87,53 +101,47 @@ void thresholding(double threshold, Mat &input, Mat &output){
 	}
 }
 
-long ***hough(Mat &mag_thr, Mat &grad_ori, int radius){
-	long ***hough_array;
-	hough_array = malloc3dArray(mag_thr.cols,mag_thr.rows,radius);
+void hough(Mat &mag_thr, Mat &grad_ori, int radius, Mat &hspace){
 
 	int x0[2], y0[2];
 	double valMag, valAng;
-
-	for (int x = 0; x < mag_thr.rows; x++) {
-		for (int y = 0; y < mag_thr.cols; y++) {
+	for (int y = 0; y < mag_thr.rows; y++) {
+		for (int x = 0; x < mag_thr.cols; x++) {
 			for (int r = 0; r < radius; r++) {
-				if (mag_thr.at<double>(x, y) > 0) {
-					valAng = grad_ori.at<double>(x,y);
-					y0[0] = y + (r * cos(valAng));
-					y0[1] = y - (r * cos(valAng));
-					x0[0] = x + (r * sin(valAng));
-					x0[1] = x - (r * sin(valAng));
+				if (mag_thr.at<double>(y, x) > 0) {
+					valAng = grad_ori.at<double>(y,x);
+					x0[0] = x + (r * cos(valAng));
+					x0[1] = x - (r * cos(valAng));
+					y0[0] = y + (r * sin(valAng));
+					y0[1] = y - (r * sin(valAng));
 					for (int m = 0; m < 2; m++) {
 						for (int n = 0; n < 2; n++) {
-							bool f1 = (x0[m] > 0 && x0[m] < mag_thr.rows);
-							bool f2 = (y0[n] > 0 && y0[n] < mag_thr.cols);
-							if (f1 && f2) hough_array[y0[n]][x0[m]][r]++;
+							bool f1 = (y0[n] > 0 && y0[n] < mag_thr.rows);
+							bool f2 = (x0[m] > 0 && x0[m] < mag_thr.cols);
+							if (f1 && f2) hspace.at<double>(y0[n],x0[m],r) += 1;
 						}
 					}
-
 				}
 			}
 		}
 	}
-
-	return hough_array;
 }
 
-void houghToMat(long ***hough_array, Mat &output, int radius){
+void houghToMat(Mat hough_array, Mat &output, int radius){
 	int rSum;
-	for (int x = 0; x < output.rows; x++) {
-		for (int y = 0; y < output.cols; y++) {
+	for (int y = 0; y < output.rows; y++) {
+		for (int x = 0; x < output.cols; x++) {
 			rSum = 0;
 			for (int r = 0; r < radius; r++) {
-				rSum += hough_array[y][x][r];
+				rSum += hough_array.at<double>(y,x,r);
 			}
-			output.at<double>(x,y) = rSum;
+			output.at<double>(y,x) = rSum;
 		}
 	}
 
 }
 
-void circleHighlight(long ***hough_array, Mat &output, int threshold, int radius){
+void circleHighlight(Mat hough_array, Mat &output, int threshold, int radius){
 	int x0,y0;
 	long max = 0;
 	std::cout << "x\ty\tr" << '\n';
@@ -144,7 +152,7 @@ void circleHighlight(long ***hough_array, Mat &output, int threshold, int radius
 				// 	max =  hough_array[x][y][r] ;
 				// 	std::cout << "max:"<< max << '\n';
 				// }
-				if (hough_array[x][y][r] > threshold){
+				if (hough_array.at<long>(y,x,r) > threshold){
 					std::cout << x <<'\t'<<y<<'\t'<<r << '\n';
 					for (int d = 0; d < 360; d += 1) {
 						x0 = x + r * cos(d);
@@ -225,25 +233,28 @@ Mat output_dy_norm;
 //part 2, hough
 
 Mat output_thresholded;
-thresholding(40, output_mag_norm, output_thresholded);
+thresholding(50, output_mag_norm, output_thresholded);
 imwrite( "output_thresholded.jpg", output_thresholded );
 
-long ***hspace; //Want to change this to mat all the way through
+// long ***hspace; //Want to change this to mat all the way through
 int radius = 50;
-hspace = hough(output_thresholded, output_ang, radius); //Have create 3d hough mat
-Mat ouput_hough;
-ouput_hough.create(output_ang.size(), output_ang.type());
-suppress(hspace, 0.8, output_ang.cols, output_ang.rows, radius, 30); //Suppress 3d hough mat
-houghToMat(hspace, ouput_hough, radius); //Take 3d hough mat to 2d hough mat
+int dims[3] = {output_ang.rows, output_ang.cols, radius};
+Mat hspace = Mat(3, dims, CV_64F);
+zeroHspace(hspace, dims);
+hough(output_thresholded, output_ang, radius, hspace); //Have create 3d hough mat
+Mat output_hough;
+output_hough.create(output_ang.size(), output_ang.type());
+Mat supH;
+suppress(hspace, 0.8, output_ang.cols, output_ang.rows, radius, 50, supH); //Suppress 3d hough mat
+houghToMat(supH, output_hough, radius); //Take 3d hough mat to 2d hough mat
+Mat output_hough_norm;
+normalize(output_hough, output_hough_norm, 0, 255, NORM_MINMAX);
 
-Mat ouput_hough_norm;
-normalize(ouput_hough, ouput_hough_norm, 0, 255, NORM_MINMAX);
-
-imwrite( "output_hough.jpg", ouput_hough_norm);
+imwrite( "output_hough.jpg", output_hough_norm);
 
 Mat output_circles;
 output_circles.create(output_ang.size(), output_ang.type());
-circleHighlight(hspace, output_mag_norm, 18, radius);
+circleHighlight(supH, output_mag_norm, 18, radius);
 imwrite( "output_circles.jpg", output_mag_norm);
 
  return 0;
