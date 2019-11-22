@@ -51,7 +51,6 @@ int main( int argc, char** argv ){
     Mat hspaceLine(Size(180, maxDistance), mag.type(), Scalar(0));
     houghLine(mag, ang, hspaceLine);
 
-    // std::cout << hspaceLine << '\n';
 
     imwrite( "convdx.jpg", convImdx );
     imwrite( "convdy.jpg", convImdy );
@@ -71,7 +70,7 @@ void houghLine(Mat &mag, Mat &ang, Mat &hspace){
     int count = 0;
 	for (int y = 0; y < mag.rows; y++) {
 		for (int x = 0; x < mag.cols; x++) {
-			if (mag.at<double>(y, x) > 100) {
+			if (mag.at<double>(y, x) > 200) {
                 for (int theta = 0; theta < 180; theta+=1){
     				p = x * cos(theta*M_PI/180) + y * sin(theta*M_PI/180);
                     if (p < hspace.rows && theta < hspace.cols
