@@ -6,13 +6,16 @@
 #include <math.h>
 
 #define rad 60
+int maxDistance;
 
 using namespace cv;
 using namespace std;
 
-void conv(cv::Mat &input, int size, Mat kernel, cv::Mat &convOutput, Mat &unNorm);
+void conv(cv::Mat &input, Mat kernel, cv::Mat &convOutput);
 void grad(Mat &dx, Mat &dy, Mat &mag, Mat &ang);
-void houghLine(Mat &mag_thr, Mat &grad_ori, Mat &hspace);
+void houghLine(Mat &mag_thr, Mat &grad_ori, Mat &hspace, int threshold);
+void suppressLine(Mat &hspace, double bound,int suppRange, Mat &out);
+void lineHighlight(Mat &hspace, Mat &output);
 
 int main( int argc, char** argv ){
     // LOADING THE IMAGE
@@ -39,20 +42,30 @@ int main( int argc, char** argv ){
     Mat kerndy(3,3, CV_64F, myKdy);
 
     Mat convImdx, dxNonNorm;
-    conv(gray_image,kSize,kerndx,convImdx,dxNonNorm);
+    conv(gray_image,kerndx,dxNonNorm);
 
     Mat convImdy, dyNonNorm;
-    conv(gray_image,kSize,kerndy,convImdy,dyNonNorm);
+    conv(gray_image,kerndy,dyNonNorm);
 
     Mat mag,ang;
     grad(dxNonNorm, dyNonNorm, mag, ang);
 
-    int maxDistance = sqrt(pow(mag.cols,2)+pow(mag.rows,2));
-    Mat hspaceLine(Size(180, maxDistance), mag.type(), Scalar(0));
-    houghLine(mag, ang, hspaceLine);
+
+    //hough line core code
+    maxDistance = sqrt(pow(mag.cols,2)+pow(mag.rows,2));
+    Mat hspaceLine(Size(180, maxDistance*2), CV_64F, Scalar(0));
+    houghLine(mag, ang, hspaceLine, 200);
+
+    Mat supHLine;
+    suppressLine(hspaceLine, 0.5, 20, supHLine);
+    lineHighlight(supHLine, image);
+    imwrite( "lineDetected.jpg", image);
 
 
+    //
+    normalize(dxNonNorm, convImdx, 0, 255, NORM_MINMAX);
     imwrite( "convdx.jpg", convImdx );
+    normalize(dyNonNorm, convImdy, 0, 255, NORM_MINMAX);
     imwrite( "convdy.jpg", convImdy );
     normalize(mag, mag, 0, 255, NORM_MINMAX);
     imwrite( "mag.jpg", mag );
@@ -60,22 +73,70 @@ int main( int argc, char** argv ){
     imwrite( "ang.jpg", ang );
     normalize(hspaceLine, hspaceLine, 0, 255, NORM_MINMAX);
     imwrite( "hspaceLine.jpg", hspaceLine );
+    imwrite( "suppressLine.jpg", supHLine );
     return 0;
 }
 
-void houghLine(Mat &mag, Mat &ang, Mat &hspace){
+void lineHighlight(Mat &hspace, Mat &output){
+	long max = 0;
+	std::cout << "p\ttheta" << '\n';
+	for (int p = 0; p < hspace.rows; p++) {
+		for (int theta = 0; theta < hspace.cols; theta++) {
+			if (hspace.at<double>(p,theta) > 0){
+				std::cout << p <<'\t'<<theta<< '\n';
+                double rho = p - maxDistance;
+                double a = cos(theta*M_PI/180);
+                double b = sin(theta*M_PI/180);
+                double x0 = rho * a;
+                double y0 = rho * b;
+                Point p1,p2;
+                p1.x = x0 + 1000*(-b);
+                p1.y = y0 + 1000*a;
+                p2.x = x0 - 1000*(-b);
+                p2.y = y0 - 1000*a;
+                line(output, p1, p2, Scalar(0,255,0), 3);
+			}
+		}
+	}
+}
 
-	int p;
-	double valAng;
-    int count = 0;
+void suppressLine(Mat &hspace, double bound,int suppRange, Mat &out) {
+	out.create(hspace.size(), hspace.type());
+    Mat tempHspace = hspace.clone();
+	if (bound > 1) {
+		cout << "bound needs to be 1 or less" << endl;
+		return;
+	}
+	int maxIdx[2];
+    double max;
+	minMaxIdx(tempHspace, NULL, &max, NULL, maxIdx);
+    // std::cout << max2 << '\n';
+	double loopMax = max;
+	// // out.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]) = loopMax;
+	while (loopMax > bound * max) {
+		out.at<double>(maxIdx[0],maxIdx[1]) = loopMax;
+		for (int j = maxIdx[0] - suppRange; j < tempHspace.rows && j < maxIdx[0] + suppRange; j++) {
+			for (int i = maxIdx[1] - suppRange; i < tempHspace.cols && i < maxIdx[1] + suppRange; i++) {
+				if (j < 0) j = 0;
+				if (i < 0) i = 0;
+				tempHspace.at<long>(j,i) = 0;
+			}
+		}
+	// 	// hMat = Mat(3, dims, CV_64F, hspace);
+		minMaxIdx(tempHspace, NULL, &loopMax, NULL, maxIdx);
+	// 	loopMax = hspace.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]);
+	}
+}
+
+void houghLine(Mat &mag, Mat &ang, Mat &hspace, int threshold){
+
 	for (int y = 0; y < mag.rows; y++) {
 		for (int x = 0; x < mag.cols; x++) {
-			if (mag.at<double>(y, x) > 200) {
+			if (mag.at<double>(y, x) > threshold) {
                 for (int theta = 0; theta < 180; theta+=1){
-    				p = x * cos(theta*M_PI/180) + y * sin(theta*M_PI/180);
-                    if (p < hspace.rows && theta < hspace.cols
-                        && p >= 0 && theta >= 0){
-                            hspace.at<double>(p, theta) += 1;
+    				double p = x * cos(theta*M_PI/180) + y * sin(theta*M_PI/180);
+                    if (p < hspace.rows && theta < hspace.cols){
+                        hspace.at<double>(p+maxDistance, theta) += 1;
                     }
                 }
 			}
@@ -104,12 +165,17 @@ void grad(Mat &dx, Mat &dy, Mat &mag, Mat &ang) {
 	ang = angOut;
 }
 
-void conv(cv::Mat &input, int size, Mat kernel, cv::Mat &convOutput, Mat &unNorm)
+void conv(cv::Mat &input, Mat kernel, cv::Mat &output)
 {
 	// intialise the output using the input
-	Mat temp;
-	temp.create(input.size(), CV_64F);
-	convOutput.create(input.size(), input.type());
+	output.create(input.size(), DataType<double>::type);
+
+	// create the Gaussian kernel in 1D
+	// cv::Mat kX = cv::getGaussianKernel(size, -1);
+	// cv::Mat kY = cv::getGaussianKernel(size, -1);
+	//
+	// // make it 2D multiply one by the transpose of the other
+	// cv::Mat kernel = kX * kY.t();
 
 	//CREATING A DIFFERENT IMAGE kernel WILL BE NEEDED
 	//TO PERFORM OPERATIONS OTHER THAN GUASSIAN BLUR!!!
@@ -119,11 +185,20 @@ void conv(cv::Mat &input, int size, Mat kernel, cv::Mat &convOutput, Mat &unNorm
 	int kernelRadiusX = ( kernel.size[0] - 1 ) / 2;
 	int kernelRadiusY = ( kernel.size[1] - 1 ) / 2;
 
+       // SET KERNEL VALUES
+	// for( int m = -kernelRadiusX; m <= kernelRadiusX; m++ ) {
+	//   for( int n = -kernelRadiusY; n <= kernelRadiusY; n++ )
+    //        kernel.at<double>(m+ kernelRadiusX, n+ kernelRadiusY) = (double) 1.0/(size*size);
+	//
+    //    }
+
 	cv::Mat paddedInput;
 	cv::copyMakeBorder( input, paddedInput,
 		kernelRadiusX, kernelRadiusX, kernelRadiusY, kernelRadiusY,
 		cv::BORDER_REPLICATE );
 
+
+	Mat result(input.rows, input.cols,DataType<double>::type);
 	// now we can do the convoltion
 	for ( int i = 0; i < input.rows; i++ )
 	{
@@ -149,9 +224,8 @@ void conv(cv::Mat &input, int size, Mat kernel, cv::Mat &convOutput, Mat &unNorm
 				}
 			}
 			// set the output value as the sum of the convolution
-			temp.at<double>(i, j) = sum;
+			output.at<double>(i, j) = sum;
 		}
 	}
-	unNorm = temp.clone();
-	normalize(temp, convOutput, 0, 255, NORM_MINMAX);
+
 }
