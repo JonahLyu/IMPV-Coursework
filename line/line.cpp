@@ -18,6 +18,7 @@ void houghLine(Mat &mag_thr, Mat &grad_ori, Mat &hspace, int threshold);
 void suppressLine(Mat &hspace, double bound,int suppRange, Mat &out);
 vector< tuple <double, double, double> > lineHighlight(Mat &hspace, Mat &output);
 Point getIntersect(tuple <double, double, double> l1, tuple <double, double, double> l2);
+bool inCirc(int centreX, int centreY, int radius, Point p1);
 
 int main( int argc, char** argv ){
     // LOADING THE IMAGE
@@ -62,9 +63,21 @@ int main( int argc, char** argv ){
     suppressLine(hspaceLine, 0.5, 20, supHLine);
     vector< tuple <double, double, double> > lines;
     lines = lineHighlight(supHLine, image);
-    Point p1 = getIntersect(lines[0],lines[1]);
-    std::cout << p1 << '\n';
-    line(image, p1, Point(p1.x+1, p1.y+1), Scalar(255,0,0), 3);
+	vector<Point> iPoints; //Intersection points
+	for (int i = 0; i < lines.size(); i++) {
+		for (int j = i+1; j < lines.size(); j++) {
+			Point p1 = getIntersect(lines[i],lines[j]);
+			iPoints.push_back(p1);
+    		line(image, p1, Point(p1.x+1, p1.y+1), Scalar(255,0,0), 3);
+		}
+	}
+	for (Point i : iPoints) {
+		if (inCirc(image.cols/2, image.rows/2, 30, i)) {
+			cout << i << " in range" << endl;
+		} else {
+			cout << i << " not in range" << endl;
+		}
+	}
     imwrite( "lineDetected.jpg", image);
 
 
@@ -83,22 +96,19 @@ int main( int argc, char** argv ){
     return 0;
 }
 
+bool inCirc(int centreX, int centreY, int radius, Point p1) {
+	bool xFlag = p1.x > centreX - radius && p1.x < centreX + radius;
+	bool yFlag = p1.y > centreY - radius && p1.y < centreY + radius;
+	return xFlag && yFlag;
+}
+
 float gradient(pair<Point, Point> line) {
 	Point p1 = line.first;
 	Point p2 = line.second;
 	return (p2.y - p1.y)/(p2.x-p1.x);
 }
 
-void detectIntersect(vector< pair<Point, Point> > lines) {
-	vector<float> grads;
-	for (int i = 0; i < lines.size(); i++) {
-		grads.push_back(gradient(lines[i]));
-	}
-}
-
 Point getIntersect(tuple <double, double, double> l1, tuple <double, double, double> l2){
-    std::cout << get<1>(l1) << '\n';
-    std::cout << get<1>(l2) << '\n';
     double c1 = get<0>(l1);
     double a1 = get<1>(l1);
     double b1 = get<2>(l1);
