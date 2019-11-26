@@ -21,6 +21,7 @@ using namespace cv;
 /** Function Headers */
 void houghSetup(Mat image, Mat &ang, Mat &mag);
 void lineMain(Mat image, Mat &ang, Mat &mag);
+void circleMain(Mat image, Mat &ang, Mat &mag);
 
 int pullNum(const char* name);
 bool rectIntersect(Rect r1, Rect r2, int thresh);
@@ -37,6 +38,7 @@ vector< tuple <double, double, double> > lineHighlight(Mat &hspace, Mat &output)
 Point getIntersect(tuple <double, double, double> l1, tuple <double, double, double> l2);
 bool inCirc(int centreX, int centreY, int radius, Point p1);
 //Circle Funcs
+void thresholding(double threshold, Mat &input, Mat &output);
 void suppressCircles(Mat &hspace, double bound, int cols, int rows, int rad, int suppRange, Mat &out);
 void houghCircle(Mat &mag_thr, Mat &grad_ori, int radius, Mat &hspace);
 void circleHighlight(Mat hough_array, Mat &output, int threshold, int radius);
@@ -73,72 +75,12 @@ int main( int argc, const char** argv )
 	// cout << frame.cols << " " << frame.rows << endl;
 	imwrite( "dart_detected.jpg", frame );
 
-	// // CONVERT COLOUR AND SAVE
-    // Mat gray_image;
-    // cvtColor( image, gray_image, CV_BGR2GRAY );
-    // int kSize = 3;
-    // double myKdx[3][3] = {{-1,0,1},
-    // 					{-2,0,2},
-    // 					{-1,0,1}};
-    // double myKdy[3][3] = {{-1,-2,-1},
-    // 					{0,0,0},
-    // 					{1,2,1}};
-    // Mat kerndx(3,3, CV_64F, myKdx);
-    // Mat kerndy(3,3, CV_64F, myKdy);
-
-    // Mat convImdx, dxNonNorm;
-    // conv(gray_image,kerndx,dxNonNorm);
-
-    // Mat convImdy, dyNonNorm;
-    // conv(gray_image,kerndy,dyNonNorm);
-
-    // Mat mag,ang;
-    // grad(dxNonNorm, dyNonNorm, mag, ang);
-
 	Mat mag;
 	Mat ang;
 	houghSetup(image, ang, mag);
 	lineMain(image, ang, mag);
+	circleMain(image, ang, mag);
 
-    // //hough line core code
-    // maxDistance = sqrt(pow(mag.cols,2)+pow(mag.rows,2));
-    // Mat hspaceLine(Size(180, maxDistance*2), CV_64F, Scalar(0));
-    // houghLine(mag, ang, hspaceLine, 200);
-
-    // Mat supHLine;
-    // suppressLine(hspaceLine, 0.5, 20, supHLine);
-    // vector< tuple <double, double, double> > lines;
-    // lines = lineHighlight(supHLine, image);
-	// vector<Point> iPoints; //Intersection points
-	// for (int i = 0; i < lines.size(); i++) {
-	// 	for (int j = i+1; j < lines.size(); j++) {
-	// 		Point p1 = getIntersect(lines[i],lines[j]);
-	// 		iPoints.push_back(p1);
-    // 		line(image, p1, Point(p1.x+1, p1.y+1), Scalar(255,0,0), 3);
-	// 	}
-	// }
-	// for (Point i : iPoints) {
-	// 	if (inCirc(image.cols/2, image.rows/2, 30, i)) {
-	// 		cout << i << " in range" << endl;
-	// 	} else {
-	// 		cout << i << " not in range" << endl;
-	// 	}
-	// }
-    // imwrite( "lineDetected.jpg", image);
-
-
-    // //
-    // normalize(dxNonNorm, convImdx, 0, 255, NORM_MINMAX);
-    // imwrite( "convdx.jpg", convImdx );
-    // normalize(dyNonNorm, convImdy, 0, 255, NORM_MINMAX);
-    // imwrite( "convdy.jpg", convImdy );
-    // normalize(mag, mag, 0, 255, NORM_MINMAX);
-    // imwrite( "mag.jpg", mag );
-    // normalize(ang, ang, 0, 255, NORM_MINMAX);
-    // imwrite( "ang.jpg", ang );
-    // normalize(hspaceLine, hspaceLine, 0, 255, NORM_MINMAX);
-    // imwrite( "hspaceLine.jpg", hspaceLine );
-    // imwrite( "suppressLine.jpg", supHLine );
     return 0;
 }
 
@@ -193,19 +135,39 @@ void lineMain(Mat image, Mat &ang, Mat &mag) {
 		}
 	}
 
-    //
-    // normalize(dxNonNorm, convImdx, 0, 255, NORM_MINMAX);
-    // imwrite( "convdx.jpg", convImdx );
-    // normalize(dyNonNorm, convImdy, 0, 255, NORM_MINMAX);
-    // imwrite( "convdy.jpg", convImdy );
-    // normalize(mag, mag, 0, 255, NORM_MINMAX);
-    // imwrite( "mag.jpg", mag );
-    // normalize(ang, ang, 0, 255, NORM_MINMAX);
-    // imwrite( "ang.jpg", ang );
     normalize(hspaceLine, hspaceLine, 0, 255, NORM_MINMAX);
     imwrite( "hspaceLine.jpg", hspaceLine );
     imwrite( "suppressLine.jpg", supHLine );
 	imwrite( "lineDetected.jpg", image);
+}
+
+void circleMain(Mat image, Mat &ang, Mat &mag) {
+	Mat output_mag_norm;
+	normalize(mag, output_mag_norm, 0, 255, NORM_MINMAX);
+	Mat output_thresholded;
+	thresholding(40, output_mag_norm, output_thresholded);
+	imwrite( "output_thresholded.jpg", output_thresholded );
+
+	// long ***hspace; //Want to change this to mat all the way through
+	int radius = 50;
+	int dims[3] = {ang.rows, ang.cols, radius};
+	Mat hspace = Mat(3, dims, CV_64F, Scalar(0));
+	// zeroHspace(hspace, dims);
+	houghCircle(output_thresholded, ang, radius, hspace); //Have create 3d hough mat
+	Mat output_hough;
+	output_hough.create(ang.size(), ang.type());
+	Mat supH;
+	suppressCircles(hspace, 0.4, ang.cols, ang.rows, radius, 50, supH); //Suppress 3d hough mat
+	houghToMat(supH, output_hough, radius); //Take 3d hough mat to 2d hough mat
+	Mat output_hough_norm;
+	normalize(output_hough, output_hough_norm, 0, 255, NORM_MINMAX);
+
+	imwrite( "output_hough.jpg", output_hough_norm);
+
+	Mat output_circles;
+	output_circles.create(ang.size(), ang.type());
+	circleHighlight(supH, output_mag_norm, 18, radius);
+	imwrite( "output_circles.jpg", output_mag_norm);
 }
 
 //Specifc function to pull file number out of files following format xN.jpg where x is a string an N is an integer
@@ -505,9 +467,19 @@ void grad(Mat &dx, Mat &dy, Mat &mag, Mat &ang) {
 //CIRCLE FUNCTIONS//
 ////////////////////
 
+void thresholding(double threshold, Mat &input, Mat &output){
+	output.create(input.size(),input.type());
+	for (int i = 0; i < input.rows; i++) {
+		for (int j = 0; j < input.cols; j++) {
+			if (input.at<double>(i,j) > threshold) output.at<double>(i,j) = 255.0;
+			else output.at<double>(i,j) = 0.0;
+		}
+	}
+}
+
 void suppressCircles(Mat &hspace, double bound, int cols, int rows, int rad, int suppRange, Mat &out) {
 	int dims[3] = {rows, cols, rad};
-	out = Mat(dims, hspace.type(), Scalar(0));
+	out = Mat(3, dims, CV_64F);
 	if (bound > 1) {
 		cout << "bound needs to be 1 or less" << endl;
 		return;
