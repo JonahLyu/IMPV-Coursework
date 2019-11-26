@@ -19,6 +19,9 @@ using namespace std;
 using namespace cv;
 
 /** Function Headers */
+void houghSetup(Mat image, Mat &ang, Mat &mag);
+void lineMain(Mat image, Mat &ang, Mat &mag);
+
 int pullNum(const char* name);
 bool rectIntersect(Rect r1, Rect r2, int thresh);
 vector<Rect> getTruths( int index );
@@ -50,6 +53,7 @@ int main( int argc, const char** argv )
 {
        // 1. Read Input Image
 	Mat frame = imread(argv[1], CV_LOAD_IMAGE_COLOR);
+	Mat image = frame.clone();
 
 	vector<Rect> gt;
 
@@ -69,7 +73,138 @@ int main( int argc, const char** argv )
 	// cout << frame.cols << " " << frame.rows << endl;
 	imwrite( "dart_detected.jpg", frame );
 
-	return 0;
+	// // CONVERT COLOUR AND SAVE
+    // Mat gray_image;
+    // cvtColor( image, gray_image, CV_BGR2GRAY );
+    // int kSize = 3;
+    // double myKdx[3][3] = {{-1,0,1},
+    // 					{-2,0,2},
+    // 					{-1,0,1}};
+    // double myKdy[3][3] = {{-1,-2,-1},
+    // 					{0,0,0},
+    // 					{1,2,1}};
+    // Mat kerndx(3,3, CV_64F, myKdx);
+    // Mat kerndy(3,3, CV_64F, myKdy);
+
+    // Mat convImdx, dxNonNorm;
+    // conv(gray_image,kerndx,dxNonNorm);
+
+    // Mat convImdy, dyNonNorm;
+    // conv(gray_image,kerndy,dyNonNorm);
+
+    // Mat mag,ang;
+    // grad(dxNonNorm, dyNonNorm, mag, ang);
+
+	Mat mag;
+	Mat ang;
+	houghSetup(image, ang, mag);
+	lineMain(image, ang, mag);
+
+    // //hough line core code
+    // maxDistance = sqrt(pow(mag.cols,2)+pow(mag.rows,2));
+    // Mat hspaceLine(Size(180, maxDistance*2), CV_64F, Scalar(0));
+    // houghLine(mag, ang, hspaceLine, 200);
+
+    // Mat supHLine;
+    // suppressLine(hspaceLine, 0.5, 20, supHLine);
+    // vector< tuple <double, double, double> > lines;
+    // lines = lineHighlight(supHLine, image);
+	// vector<Point> iPoints; //Intersection points
+	// for (int i = 0; i < lines.size(); i++) {
+	// 	for (int j = i+1; j < lines.size(); j++) {
+	// 		Point p1 = getIntersect(lines[i],lines[j]);
+	// 		iPoints.push_back(p1);
+    // 		line(image, p1, Point(p1.x+1, p1.y+1), Scalar(255,0,0), 3);
+	// 	}
+	// }
+	// for (Point i : iPoints) {
+	// 	if (inCirc(image.cols/2, image.rows/2, 30, i)) {
+	// 		cout << i << " in range" << endl;
+	// 	} else {
+	// 		cout << i << " not in range" << endl;
+	// 	}
+	// }
+    // imwrite( "lineDetected.jpg", image);
+
+
+    // //
+    // normalize(dxNonNorm, convImdx, 0, 255, NORM_MINMAX);
+    // imwrite( "convdx.jpg", convImdx );
+    // normalize(dyNonNorm, convImdy, 0, 255, NORM_MINMAX);
+    // imwrite( "convdy.jpg", convImdy );
+    // normalize(mag, mag, 0, 255, NORM_MINMAX);
+    // imwrite( "mag.jpg", mag );
+    // normalize(ang, ang, 0, 255, NORM_MINMAX);
+    // imwrite( "ang.jpg", ang );
+    // normalize(hspaceLine, hspaceLine, 0, 255, NORM_MINMAX);
+    // imwrite( "hspaceLine.jpg", hspaceLine );
+    // imwrite( "suppressLine.jpg", supHLine );
+    return 0;
+}
+
+void houghSetup(Mat image, Mat &ang, Mat &mag) {
+	// CONVERT COLOUR AND SAVE
+    Mat gray_image;
+    cvtColor( image, gray_image, CV_BGR2GRAY );
+    int kSize = 3;
+    double myKdx[3][3] = {{-1,0,1},
+    					{-2,0,2},
+    					{-1,0,1}};
+    double myKdy[3][3] = {{-1,-2,-1},
+    					{0,0,0},
+    					{1,2,1}};
+    Mat kerndx(3,3, CV_64F, myKdx);
+    Mat kerndy(3,3, CV_64F, myKdy);
+
+    Mat convImdx, dxNonNorm;
+    conv(gray_image,kerndx,dxNonNorm);
+
+    Mat convImdy, dyNonNorm;
+    conv(gray_image,kerndy,dyNonNorm);
+
+    grad(dxNonNorm, dyNonNorm, mag, ang);
+}
+
+void lineMain(Mat image, Mat &ang, Mat &mag) {
+	//hough line core code
+    maxDistance = sqrt(pow(mag.cols,2)+pow(mag.rows,2));
+    Mat hspaceLine(Size(180, maxDistance*2), CV_64F, Scalar(0));
+    houghLine(mag, ang, hspaceLine, 200);
+
+    Mat supHLine;
+    suppressLine(hspaceLine, 0.5, 20, supHLine);
+    vector< tuple <double, double, double> > lines;
+    lines = lineHighlight(supHLine, image);
+	vector<Point> iPoints; //Intersection points
+	for (int i = 0; i < lines.size(); i++) {
+		for (int j = i+1; j < lines.size(); j++) {
+			Point p1 = getIntersect(lines[i],lines[j]);
+			iPoints.push_back(p1);
+    		line(image, p1, Point(p1.x+1, p1.y+1), Scalar(255,0,0), 3);
+		}
+	}
+	for (Point i : iPoints) {
+		if (inCirc(image.cols/2, image.rows/2, 30, i)) {
+			cout << i << " in range" << endl;
+		} else {
+			cout << i << " not in range" << endl;
+		}
+	}
+    imwrite( "lineDetected.jpg", image);
+
+
+    //
+    // normalize(dxNonNorm, convImdx, 0, 255, NORM_MINMAX);
+    // imwrite( "convdx.jpg", convImdx );
+    // normalize(dyNonNorm, convImdy, 0, 255, NORM_MINMAX);
+    // imwrite( "convdy.jpg", convImdy );
+    // normalize(mag, mag, 0, 255, NORM_MINMAX);
+    // imwrite( "mag.jpg", mag );
+    // normalize(ang, ang, 0, 255, NORM_MINMAX);
+    // imwrite( "ang.jpg", ang );
+    // normalize(hspaceLine, hspaceLine, 0, 255, NORM_MINMAX);
+    // imwrite( "hspaceLine.jpg", hspaceLine );
+    // imwrite( "suppressLine.jpg", supHLine );
 }
 
 //Specifc function to pull file number out of files following format xN.jpg where x is a string an N is an integer
@@ -275,11 +410,11 @@ Point getIntersect(tuple <double, double, double> l1, tuple <double, double, dou
 vector< tuple <double, double, double> > lineHighlight(Mat &hspace, Mat &output){
 	vector< tuple <double, double, double> > lines;
 	long max = 0;
-	std::cout << "p\ttheta" << '\n';
+	// std::cout << "p\ttheta" << '\n';
 	for (int p = 0; p < hspace.rows; p++) {
 		for (int theta = 0; theta < hspace.cols; theta++) {
 			if (hspace.at<double>(p,theta) > 0){
-				std::cout << p <<'\t'<<theta<< '\n';
+				// std::cout << p <<'\t'<<theta<< '\n';
                 double rho = p - maxDistance;
                 double a = cos(theta*M_PI/180);
                 double b = sin(theta*M_PI/180);
