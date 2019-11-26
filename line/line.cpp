@@ -4,6 +4,7 @@
 #include <opencv/highgui.h>   //adjust import locations
 #include <opencv/cxcore.h>    //depending on your machine setup
 #include <math.h>
+#include <tuple>
 
 #define rad 60
 int maxDistance;
@@ -15,7 +16,8 @@ void conv(cv::Mat &input, Mat kernel, cv::Mat &convOutput);
 void grad(Mat &dx, Mat &dy, Mat &mag, Mat &ang);
 void houghLine(Mat &mag_thr, Mat &grad_ori, Mat &hspace, int threshold);
 void suppressLine(Mat &hspace, double bound,int suppRange, Mat &out);
-void lineHighlight(Mat &hspace, Mat &output);
+vector< tuple <double, double, double> > lineHighlight(Mat &hspace, Mat &output);
+Point getIntersect(tuple <double, double, double> l1, tuple <double, double, double> l2);
 
 int main( int argc, char** argv ){
     // LOADING THE IMAGE
@@ -58,7 +60,11 @@ int main( int argc, char** argv ){
 
     Mat supHLine;
     suppressLine(hspaceLine, 0.5, 20, supHLine);
-    lineHighlight(supHLine, image);
+    vector< tuple <double, double, double> > lines;
+    lines = lineHighlight(supHLine, image);
+    Point p1 = getIntersect(lines[0],lines[1]);
+    std::cout << p1 << '\n';
+    line(image, p1, Point(p1.x+1, p1.y+1), Scalar(255,0,0), 3);
     imwrite( "lineDetected.jpg", image);
 
 
@@ -90,8 +96,30 @@ void detectIntersect(vector< pair<Point, Point> > lines) {
 	}
 }
 
-void lineHighlight(Mat &hspace, Mat &output){
-	vector< pair<Point, Point> > lines;
+Point getIntersect(tuple <double, double, double> l1, tuple <double, double, double> l2){
+    std::cout << get<1>(l1) << '\n';
+    std::cout << get<1>(l2) << '\n';
+    double c1 = get<0>(l1);
+    double a1 = get<1>(l1);
+    double b1 = get<2>(l1);
+    double c2 = get<0>(l2);
+    double a2 = get<1>(l2);
+    double b2 = get<2>(l2);
+    double det = a1*b2 - a2*b1;
+    Point p;
+    p.x = (b2*c1 - b1*c2) / det;
+    p.y = (a1*c2 - a2*c1) / det;
+    return p;
+
+}
+
+// void getAllIntersect(vector< tuple <double, double, double> > lines){
+//
+//
+// }
+
+vector< tuple <double, double, double> > lineHighlight(Mat &hspace, Mat &output){
+	vector< tuple <double, double, double> > lines;
 	long max = 0;
 	std::cout << "p\ttheta" << '\n';
 	for (int p = 0; p < hspace.rows; p++) {
@@ -109,11 +137,12 @@ void lineHighlight(Mat &hspace, Mat &output){
                 p2.x = x0 - 1000*(-b);
                 p2.y = y0 - 1000*a;
                 line(output, p1, p2, Scalar(0,255,0), 3);
-				pair<Point, Point> v(p1, p2);
-				lines.push_back(v);
+				tuple <double, double, double> line = make_tuple(rho, a, b);
+				lines.push_back(line);
 			}
 		}
 	}
+    return lines;
 
 }
 
