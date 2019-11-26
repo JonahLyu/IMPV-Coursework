@@ -77,7 +77,21 @@ int main( int argc, char** argv ){
     return 0;
 }
 
+float gradient(pair<Point, Point> line) {
+	Point p1 = line.first;
+	Point p2 = line.second;
+	return (p2.y - p1.y)/(p2.x-p1.x);
+}
+
+void detectIntersect(vector< pair<Point, Point> > lines) {
+	vector<float> grads;
+	for (int i = 0; i < lines.size(); i++) {
+		grads.push_back(gradient(lines[i]));
+	}
+}
+
 void lineHighlight(Mat &hspace, Mat &output){
+	vector< pair<Point, Point> > lines;
 	long max = 0;
 	std::cout << "p\ttheta" << '\n';
 	for (int p = 0; p < hspace.rows; p++) {
@@ -95,9 +109,12 @@ void lineHighlight(Mat &hspace, Mat &output){
                 p2.x = x0 - 1000*(-b);
                 p2.y = y0 - 1000*a;
                 line(output, p1, p2, Scalar(0,255,0), 3);
+				pair<Point, Point> v(p1, p2);
+				lines.push_back(v);
 			}
 		}
 	}
+
 }
 
 void suppressLine(Mat &hspace, double bound,int suppRange, Mat &out) {
