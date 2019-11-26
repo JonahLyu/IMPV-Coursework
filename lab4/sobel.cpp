@@ -239,8 +239,8 @@ imwrite( "output_thresholded.jpg", output_thresholded );
 // long ***hspace; //Want to change this to mat all the way through
 int radius = 50;
 int dims[3] = {output_ang.rows, output_ang.cols, radius};
-Mat hspace = Mat(3, dims, CV_64F);
-zeroHspace(hspace, dims);
+Mat hspace = Mat(3, dims, CV_64F, Scalar(0));
+// zeroHspace(hspace, dims);
 hough(output_thresholded, output_ang, radius, hspace); //Have create 3d hough mat
 Mat output_hough;
 output_hough.create(output_ang.size(), output_ang.type());
