@@ -167,9 +167,11 @@ void houghSetup(Mat image, Mat &ang, Mat &mag) {
 
 void lineMain(Mat image, Mat &ang, Mat &mag) {
 	//hough line core code
+
     maxDistance = sqrt(pow(mag.cols,2)+pow(mag.rows,2));
     Mat hspaceLine(Size(180, maxDistance*2), CV_64F, Scalar(0));
     houghLine(mag, ang, hspaceLine, 200);
+	std::cout << maxDistance << '\n';
 
     Mat supHLine;
     suppressLine(hspaceLine, 0.5, 20, supHLine);
@@ -190,8 +192,6 @@ void lineMain(Mat image, Mat &ang, Mat &mag) {
 			cout << i << " not in range" << endl;
 		}
 	}
-    imwrite( "lineDetected.jpg", image);
-
 
     //
     // normalize(dxNonNorm, convImdx, 0, 255, NORM_MINMAX);
@@ -202,9 +202,10 @@ void lineMain(Mat image, Mat &ang, Mat &mag) {
     // imwrite( "mag.jpg", mag );
     // normalize(ang, ang, 0, 255, NORM_MINMAX);
     // imwrite( "ang.jpg", ang );
-    // normalize(hspaceLine, hspaceLine, 0, 255, NORM_MINMAX);
-    // imwrite( "hspaceLine.jpg", hspaceLine );
-    // imwrite( "suppressLine.jpg", supHLine );
+    normalize(hspaceLine, hspaceLine, 0, 255, NORM_MINMAX);
+    imwrite( "hspaceLine.jpg", hspaceLine );
+    imwrite( "suppressLine.jpg", supHLine );
+	imwrite( "lineDetected.jpg", image);
 }
 
 //Specifc function to pull file number out of files following format xN.jpg where x is a string an N is an integer
@@ -228,7 +229,7 @@ vector<Rect> getGT(const char* name) {
 }
 
 bool rectIntersect(Rect r1, Rect r2, double thresh) {
-	//Returns a boolean indicating if the area 
+	//Returns a boolean indicating if the area
 	//shared by both rectangles is greater than the threshold
 	return ((float) (r1 & r2).area()/(r1|r2).area() > thresh);
 }
@@ -278,7 +279,7 @@ void detectAndDisplay( Mat frame , vector<Rect> gt)
 	cvtColor( frame, frame_gray, CV_BGR2GRAY );
 	equalizeHist( frame_gray, frame_gray );
 
-	// 2. Perform Viola-Jones Object Detection 
+	// 2. Perform Viola-Jones Object Detection
 	cascade.detectMultiScale( frame_gray, darts, 1.1, 1, 0|CV_HAAR_SCALE_IMAGE, Size(50, 50), Size(500,500) );
 
        // 3. Print number of Faces found
@@ -436,7 +437,7 @@ vector< tuple <double, double, double> > lineHighlight(Mat &hspace, Mat &output)
 }
 
 void suppressLine(Mat &hspace, double bound,int suppRange, Mat &out) {
-	out.create(hspace.size(), hspace.type());
+	out = Mat(hspace.size(), hspace.type(), Scalar(0));
     Mat tempHspace = hspace.clone();
 	if (bound > 1) {
 		cout << "bound needs to be 1 or less" << endl;
@@ -445,9 +446,9 @@ void suppressLine(Mat &hspace, double bound,int suppRange, Mat &out) {
 	int maxIdx[2];
     double max;
 	minMaxIdx(tempHspace, NULL, &max, NULL, maxIdx);
-    // std::cout << max2 << '\n';
+	// std::cout <<  << '\n';
 	double loopMax = max;
-	// // out.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]) = loopMax;
+	// out.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]) = loopMax;
 	while (loopMax > bound * max) {
 		out.at<double>(maxIdx[0],maxIdx[1]) = loopMax;
 		for (int j = maxIdx[0] - suppRange; j < tempHspace.rows && j < maxIdx[0] + suppRange; j++) {
@@ -506,7 +507,7 @@ void grad(Mat &dx, Mat &dy, Mat &mag, Mat &ang) {
 
 void suppressCircles(Mat &hspace, double bound, int cols, int rows, int rad, int suppRange, Mat &out) {
 	int dims[3] = {rows, cols, rad};
-	out = Mat(3, dims, CV_64F);
+	out = Mat(dims, hspace.type(), Scalar(0));
 	if (bound > 1) {
 		cout << "bound needs to be 1 or less" << endl;
 		return;
@@ -531,7 +532,7 @@ void suppressCircles(Mat &hspace, double bound, int cols, int rows, int rad, int
 		// hMat = Mat(3, dims, CV_64F, hspace);
 		minMaxIdx(hspace, NULL, NULL, NULL, maxIdx);
 		loopMax = hspace.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]);
-	}	
+	}
 }
 
 void houghCircle(Mat &mag_thr, Mat &grad_ori, int radius, Mat &hspace){
