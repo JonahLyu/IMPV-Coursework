@@ -102,6 +102,7 @@ int main( int argc, const char** argv )
 	for (int i = 0; i < darts.size(); i++) {
 		iPoints = lineMain(image, framesAng[i], framesMag[i], darts[i]);
 		circs = circleMain(image, framesAng[i], framesMag[i], darts[i]);
+		cout << circs.size() << " " << darts[i] << endl;
 		int count = 0;
 		board = getCircPair(circs); //We assume only one dartboard per frame detected by viola jones
 		for (Point p : iPoints) {
@@ -181,7 +182,7 @@ vector<circ> circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
 	thresholding(40, output_mag_norm, output_thresholded);
 	imwrite( "output_thresholded.jpg", output_thresholded );
 
-	int radius = 50;
+	int radius = ((pos.width + pos.height)/2)/2;
 	int dims[3] = {ang.rows, ang.cols, radius};
 	Mat hspace = Mat(3, dims, CV_64F, Scalar(0));
 	houghCircle(output_thresholded, ang, radius, hspace); //Have create 3d hough mat
@@ -189,7 +190,7 @@ vector<circ> circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
 	output_hough.create(ang.size(), ang.type());
 	Mat supH;
 	vector< circ > circs;
-	circs = suppressCircles(hspace, 0.7, ang.cols, ang.rows, radius, 15, supH); //Suppress 3d hough mat
+	circs = suppressCircles(hspace, 0.5, ang.cols, ang.rows, radius, 15, supH); //Suppress 3d hough mat
 	return circs;
 }
 
