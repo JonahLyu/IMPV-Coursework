@@ -19,19 +19,13 @@
 using namespace std;
 using namespace cv;
 
-struct circ {
-  int x;
-  int y;
-  int r;
-} ;
-
 /** Function Headers */
 void houghSetup(Mat image, Mat &ang, Mat &mag);
 vector<Point> lineMain(Mat image, Mat &ang, Mat &mag, Rect pos);
-vector<circ> circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos);
+vector< tuple<int, int, int> > circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos);
 
 vector<Mat> getFrames(Mat image, vector<Rect> det);
-bool circRatios(circ circs0, circ circs1);
+bool circRatios(tuple<int,int,int> circs0, tuple<int,int,int> circs1);
 
 int pullNum(const char* name);
 bool rectIntersect(Rect r1, Rect r2, int thresh);
@@ -49,7 +43,7 @@ Point getIntersect(tuple <double, double, double> l1, tuple <double, double, dou
 bool inCirc(int centreX, int centreY, int radius, Point p1);
 //Circle Funcs
 void thresholding(double threshold, Mat &input, Mat &output);
-vector< circ > suppressCircles(Mat &hspace, double bound, int cols, int rows, int rad, int suppRange, Mat &out);
+vector< tuple<int, int, int> > suppressCircles(Mat &hspace, double bound, int cols, int rows, int rad, int suppRange, Mat &out);
 void houghCircle(Mat &mag_thr, Mat &grad_ori, int radius, Mat &hspace);
 void circleHighlight(Mat hough_array, Mat &output, int threshold, int radius);
 void houghToMat(Mat hough_array, Mat &output, int radius);
@@ -93,10 +87,89 @@ int main( int argc, const char** argv )
 	vector<Mat> frames = getFrames(image, darts);
 	vector<Mat> framesMag = getFrames(mag, darts);
 	vector<Mat> framesAng = getFrames(ang, darts);
+	vector<Rect> accepted;
+	vector<Rect> potential;
+	vector< tuple<int, int, int> > circs;
+	vector<Point> iPoint;
+	// tuple<int, int, int> outer;
+	// tuple<int, int, int> inner;
+	// vector< tuple< tuple<int, int, int>, tuple<int, int, int> > > pairs;
+	bool circCount, circLocs, interLocs;
+	int min;
+	for (int i = 0; i < frames.size(); i++) {
+		circs = circleMain(image, framesAng[i], framesMag[i], darts[i]);
+		for (int x = 0; x < circs.size(); x++) {
+			for (int y = 0; y < circs.size(); y++) {
+				cout << circRatios(circs[x], circs[y]) << endl;
+				if (circRatios(circs[x], circs[y])) {
+					Rect circleRect = Rect(get<1>(circs[y])-get<2>(circs[y]), get<0>(circs[y])-get<2>(circs[y]), 2*get<2>(circs[y]), 2*get<2>(circs[y]));
+					circleRect.x += darts[i].x;
+					circleRect.y += darts[i].y;
+					potential.push_back(circleRect);
+					// pairs.push_back(make_tuple(circs[x], circs[y])); //Pairs of circles that fit what we expect from a dartboard
+				}
+			}
+		}
+		// for (int x = 0; x < pairs.size(); x++) {
+		// 	Rect circleRect = Rect(get<1>(get<0>(pairs[x]))-get<2>(get<0>(pairs[x])), get<0>(get<0>(pairs[x]))-get<2>(get<0>(pairs[x])), 2*get<2>(get<0>(pairs[x])), 2*get<2>(get<0>(pairs[x])));
+		// 	circleRect.x += darts[i].x;
+		// 	circleRect.y += darts[i].y;
+		// 	potential.push_back(circleRect);
+		// }
 
-	// for (int i = 0; i < accepted.size(); i++) {
-	// 	rectangle(out, Point(accepted[i].x, accepted[i].y), Point(accepted[i].x + accepted[i].width, accepted[i].y + accepted[i].height), Scalar( 255, 0, 0 ), 2);
+		framesMag = getFrames(mag, potential);
+		framesAng = getFrames(ang, potential);
+		for (int x = 0; x < potential.size(); x++) {
+			iPoint = lineMain(image, framesAng[i], framesMag[i], potential[i]);
+			int count = 0;
+			// cout << get<0>(inner) << " " << get<2>(inner) << endl;
+			for (Point n : iPoint) {
+				// cout << i << endl;
+				if (inCirc(potential[x].width/2, potential[x].height/2, potential[x].width/2, n)) {
+					count++;
+				}
+			}
+			interLocs = (count > 30) && (count < 60);
+			cout << interLocs << " " << darts[i] << endl;
+			if (interLocs) accepted.push_back(potential[x]);
+		}
+		
+	}
+	// for (int i = 0; i < frames.size(); i++) {
+	// 	circs = circleMain(image, framesAng[i], framesMag[i], darts[i]);
+	// 	circCount = circs.size() == 2;
+	// 	circLocs = circRatios(circs);
+	// 	if (circCount && circLocs) {
+	// 		min = get<2>(circs[0]);
+	// 		inner = circs[0];
+	// 		for (int j = 0; j < circs.size(); j++) {
+	// 			if (min > get<2>(circs[j])) {
+	// 				min = get<2>(circs[j]);
+	// 				outer = circs[0];
+	// 				inner = circs[j];
+	// 			}
+	// 		}
+	// 		iPoint = lineMain(image, framesAng[i], framesMag[i], darts[i]);
+	// 		int count = 0;
+	// 		// cout << get<0>(inner) << " " << get<2>(inner) << endl;
+	// 		for (Point i : iPoint) {
+	// 			// cout << i << endl;
+	// 			if (inCirc(get<1>(inner), get<0>(inner), get<2>(inner), i)) {
+	// 				count++;
+	// 			}
+	// 		}
+	// 		// int expectedCount = ((1 + iPoint.size()) * iPoint.size())/2;
+	// 		// cout << expectedCount << " " << count << endl;
+	// 		// cout << count << endl;
+	// 		interLocs = (count > 30) && (count < 60);
+	// 	}
+	// 	// if (circCount && circLocs && interLocs) accepted.push_back(Rect(get<1>(inner)-get<2>(inner),get<0>(inner)-get<2>(inner),2*get<2>(inner),2*get<2>(inner)));
+	// 	cout << circCount << " " << circLocs << " " << interLocs << " " << darts[i] << endl;
+	// 	if (circCount && circLocs && interLocs) accepted.push_back(darts[i]);
 	// }
+	for (int i = 0; i < accepted.size(); i++) {
+		rectangle(out, Point(accepted[i].x, accepted[i].y), Point(accepted[i].x + accepted[i].width, accepted[i].y + accepted[i].height), Scalar( 255, 0, 0 ), 2);
+	}
 	imwrite("accepted_frames.jpg", out);
     return 0;
 }
@@ -162,7 +235,7 @@ vector<Point> lineMain(Mat image, Mat &ang, Mat &mag, Rect pos) {
 }
 
 
-vector<circ> circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
+vector< tuple<int, int, int> > circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
 	Mat output_mag_norm;
 	normalize(mag, output_mag_norm, 0, 255, NORM_MINMAX);
 	Mat output_thresholded;
@@ -178,7 +251,7 @@ vector<circ> circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
 	Mat output_hough;
 	output_hough.create(ang.size(), ang.type());
 	Mat supH;
-	vector< circ > circs;
+	vector< tuple<int,int,int> > circs;
 	circs = suppressCircles(hspace, 0.7, ang.cols, ang.rows, radius, 15, supH); //Suppress 3d hough mat
 	return circs;
 	// houghToMat(supH, output_hough, radius); //Take 3d hough mat to 2d hough mat
@@ -212,12 +285,12 @@ vector<Mat> getFrames(Mat image, vector<Rect> det) {
 	return frames;
 }
 
-bool circRatios(circ circs0, circ circs1) {
+bool circRatios(tuple<int,int,int> circs0, tuple<int,int,int> circs1) {
 	//circs0 assumed to be inner when checking
 	bool yFlag, xFlag, ratioFlag;
-	yFlag = (circs0.y > circs1.y-5) && (circs0.y < circs1.y+5);
-	xFlag = (circs0.x > circs1.x-5) && (circs0.x < circs1.x+5);
-	ratioFlag = (circs1.r <= circs0.r * 2.5) && (circs1.r >= circs0.r * 1.25);
+	yFlag = (get<0>(circs0) > get<0>(circs1)-5) && (get<0>(circs0) < get<0>(circs1)+5);
+	xFlag = (get<1>(circs0) > get<1>(circs1)-5) && (get<1>(circs0) < get<1>(circs1)+5);
+	ratioFlag = (get<2>(circs1) <= get<2>(circs0) * 2.5) && (get<2>(circs1) >= get<2>(circs0) * 1.25);
 	if (yFlag && xFlag && ratioFlag) {
 		return true;
 	}
@@ -538,8 +611,8 @@ void thresholding(double threshold, Mat &input, Mat &output){
 	}
 }
 
-vector< circ > suppressCircles(Mat &hspace, double bound, int cols, int rows, int rad, int suppRange, Mat &out) {
-	vector< circ > circs;
+vector< tuple<int, int, int> > suppressCircles(Mat &hspace, double bound, int cols, int rows, int rad, int suppRange, Mat &out) {
+	vector< tuple<int, int, int> > circs;
 	int dims[3] = {rows, cols, rad};
 	out = Mat(3, dims, CV_64F);
 	if (bound > 1) {
@@ -550,15 +623,10 @@ vector< circ > suppressCircles(Mat &hspace, double bound, int cols, int rows, in
 	minMaxIdx(hspace, NULL, NULL, NULL, maxIdx);
 	double max = hspace.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]);
 	double loopMax = max;
-	circ c;
 	// out.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]) = loopMax;
 	while (loopMax > bound * max) {
 		//y,x,r
-		c.x = maxIdx[1];
-		c.y = maxIdx[0];
-		c.r = maxIdx[2];
-		// circs.push_back(make_tuple(maxIdx[0],maxIdx[1],maxIdx[2]));
-		circs.push_back(c);
+		circs.push_back(make_tuple(maxIdx[0],maxIdx[1],maxIdx[2]));
 		out.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]) = loopMax;
 		for (int j = maxIdx[0] - suppRange; j < rows && j < maxIdx[0] + suppRange; j++) {
 			for (int i = maxIdx[1] - suppRange; i < cols && i < maxIdx[1] + suppRange; i++) {
