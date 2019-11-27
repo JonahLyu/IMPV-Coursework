@@ -14,6 +14,7 @@
 #include <iostream>
 #include <string.h>
 #include <stdio.h>
+#include <tuple>
 
 using namespace std;
 using namespace cv;
@@ -21,12 +22,14 @@ using namespace cv;
 /** Function Headers */
 void houghSetup(Mat image, Mat &ang, Mat &mag);
 void lineMain(Mat image, Mat &ang, Mat &mag);
-void circleMain(Mat image, Mat &ang, Mat &mag);
+vector< tuple<int, int, int> > circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos);
+
+vector<Mat> getFrames(Mat image, vector<Rect> det);
 
 int pullNum(const char* name);
 bool rectIntersect(Rect r1, Rect r2, int thresh);
 vector<Rect> getTruths( int index );
-void detectAndDisplay( Mat frame, vector<Rect> gt );
+vector<Rect> detectAndDisplay( Mat frame, vector<Rect> gt );
 void groundTruthDraw(Mat frame, vector<Rect> gt);
 vector<Rect> getGT(const char* name);
 //Line Funcs
@@ -39,7 +42,7 @@ Point getIntersect(tuple <double, double, double> l1, tuple <double, double, dou
 bool inCirc(int centreX, int centreY, int radius, Point p1);
 //Circle Funcs
 void thresholding(double threshold, Mat &input, Mat &output);
-void suppressCircles(Mat &hspace, double bound, int cols, int rows, int rad, int suppRange, Mat &out);
+vector< tuple<int, int, int> > suppressCircles(Mat &hspace, double bound, int cols, int rows, int rad, int suppRange, Mat &out);
 void houghCircle(Mat &mag_thr, Mat &grad_ori, int radius, Mat &hspace);
 void circleHighlight(Mat hough_array, Mat &output, int threshold, int radius);
 void houghToMat(Mat hough_array, Mat &output, int radius);
@@ -68,7 +71,8 @@ int main( int argc, const char** argv )
 	if( !cascade.load( cascade_name ) ){ printf("--(!)Error loading\n"); return -1; };
 
 	// 3. Detect Faces and Display Result
-	detectAndDisplay( frame, gt );
+	vector<Rect> darts = detectAndDisplay( frame, gt );
+	// vector<Mat> frames = getFrames(image, darts);
 	// Draw ground truth rectangles on image
 	groundTruthDraw(frame, gt);
 	// 4. Save Result Image
@@ -78,8 +82,13 @@ int main( int argc, const char** argv )
 	Mat mag;
 	Mat ang;
 	houghSetup(image, ang, mag);
+	vector<Mat> frames = getFrames(image, darts);
+	vector<Mat> framesMag = getFrames(mag, darts);
+	vector<Mat> framesAng = getFrames(ang, darts);
 	lineMain(image, ang, mag);
-	circleMain(image, ang, mag);
+	for (int i = 0; i < frames.size(); i++) {
+		circleMain(image, framesAng[i], framesMag[i], darts[i]);
+	}
 
     return 0;
 }
@@ -135,13 +144,14 @@ void lineMain(Mat image, Mat &ang, Mat &mag) {
 		}
 	}
 
-    normalize(hspaceLine, hspaceLine, 0, 255, NORM_MINMAX);
-    imwrite( "hspaceLine.jpg", hspaceLine );
-    imwrite( "suppressLine.jpg", supHLine );
-	imwrite( "lineDetected.jpg", image);
+    // normalize(hspaceLine, hspaceLine, 0, 255, NORM_MINMAX);
+    // imwrite( "hspaceLine.jpg", hspaceLine );
+    // imwrite( "suppressLine.jpg", supHLine );
+	// imwrite( "lineDetected.jpg", image);
 }
 
-void circleMain(Mat image, Mat &ang, Mat &mag) {
+
+vector< tuple<int, int, int> > circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
 	Mat output_mag_norm;
 	normalize(mag, output_mag_norm, 0, 255, NORM_MINMAX);
 	Mat output_thresholded;
@@ -157,17 +167,38 @@ void circleMain(Mat image, Mat &ang, Mat &mag) {
 	Mat output_hough;
 	output_hough.create(ang.size(), ang.type());
 	Mat supH;
-	suppressCircles(hspace, 0.4, ang.cols, ang.rows, radius, 50, supH); //Suppress 3d hough mat
-	houghToMat(supH, output_hough, radius); //Take 3d hough mat to 2d hough mat
-	Mat output_hough_norm;
-	normalize(output_hough, output_hough_norm, 0, 255, NORM_MINMAX);
+	vector< tuple<int,int,int> > circs;
+	circs = suppressCircles(hspace, 0.7, ang.cols, ang.rows, radius, 15, supH); //Suppress 3d hough mat
+	return circs;
+	// houghToMat(supH, output_hough, radius); //Take 3d hough mat to 2d hough mat
+	// Mat output_hough_norm;
+	// normalize(output_hough, output_hough_norm, 0, 255, NORM_MINMAX);
 
-	imwrite( "output_hough.jpg", output_hough_norm);
+	// imwrite( "output_hough.jpg", output_hough_norm);
 
-	Mat output_circles;
-	output_circles.create(ang.size(), ang.type());
-	circleHighlight(supH, output_mag_norm, 18, radius);
-	imwrite( "output_circles.jpg", output_mag_norm);
+	// Mat output_circles;
+	// output_circles.create(ang.size(), ang.type());
+	// circleHighlight(supH, output_mag_norm, 18, radius);
+	// for (int x = 0; x < pos.width; x++){
+	// 	for (int y = 0; y < pos.height; y++){
+	// 		image.at<Vec3b>(y+pos.y,x+pos.x) = output_mag_norm.at<Vec3b>(y,x); 
+	// 	}
+	// }
+	
+	// imwrite( "output_circles.jpg", image);
+}
+
+//
+//
+//
+
+vector<Mat> getFrames(Mat image, vector<Rect> det) {
+	vector<Mat> frames;
+	for (int i = 0; i < det.size(); i++) {
+		Mat a = image(det[i]);
+		frames.push_back(a);
+	}
+	return frames;
 }
 
 //Specifc function to pull file number out of files following format xN.jpg where x is a string an N is an integer
@@ -230,7 +261,7 @@ void groundTruthDraw(Mat frame, vector<Rect> gt) {
 }
 
 /** @function detectAndDisplay */
-void detectAndDisplay( Mat frame , vector<Rect> gt)
+vector<Rect> detectAndDisplay( Mat frame , vector<Rect> gt)
 {
 	std::vector<Rect> darts;
 	Mat frame_gray;
@@ -272,6 +303,7 @@ void detectAndDisplay( Mat frame , vector<Rect> gt)
 	cout << truePos << " faces out of " << dartCount << " detected correctly." << endl;
 	cout << "True positive rate = " <<  recall << endl;
 	cout << "F1 score = " << f1 << endl;
+	return darts;
 }
 
 //////////////////
@@ -477,12 +509,13 @@ void thresholding(double threshold, Mat &input, Mat &output){
 	}
 }
 
-void suppressCircles(Mat &hspace, double bound, int cols, int rows, int rad, int suppRange, Mat &out) {
+vector< tuple<int, int, int> > suppressCircles(Mat &hspace, double bound, int cols, int rows, int rad, int suppRange, Mat &out) {
+	vector< tuple<int, int, int> > circs;
 	int dims[3] = {rows, cols, rad};
 	out = Mat(3, dims, CV_64F);
 	if (bound > 1) {
 		cout << "bound needs to be 1 or less" << endl;
-		return;
+		return circs;
 	}
 	int maxIdx[3];
 	minMaxIdx(hspace, NULL, NULL, NULL, maxIdx);
@@ -490,6 +523,8 @@ void suppressCircles(Mat &hspace, double bound, int cols, int rows, int rad, int
 	double loopMax = max;
 	// out.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]) = loopMax;
 	while (loopMax > bound * max) {
+		//y,x,r
+		circs.push_back(make_tuple(maxIdx[0],maxIdx[1],maxIdx[2]));
 		out.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]) = loopMax;
 		for (int j = maxIdx[0] - suppRange; j < rows && j < maxIdx[0] + suppRange; j++) {
 			for (int i = maxIdx[1] - suppRange; i < cols && i < maxIdx[1] + suppRange; i++) {
@@ -505,6 +540,7 @@ void suppressCircles(Mat &hspace, double bound, int cols, int rows, int rad, int
 		minMaxIdx(hspace, NULL, NULL, NULL, maxIdx);
 		loopMax = hspace.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]);
 	}
+	return circs;
 }
 
 void houghCircle(Mat &mag_thr, Mat &grad_ori, int radius, Mat &hspace){
