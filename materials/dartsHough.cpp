@@ -32,6 +32,7 @@ vector<circ> circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos);
 
 vector<Mat> getFrames(Mat image, vector<Rect> det);
 bool circRatios(circ circs0, circ circs1);
+pair<circ,circ> getCircPair(vector<circ> circs);
 
 int pullNum(const char* name);
 bool rectIntersect(Rect r1, Rect r2, int thresh);
@@ -93,10 +94,31 @@ int main( int argc, const char** argv )
 	vector<Mat> frames = getFrames(image, darts);
 	vector<Mat> framesMag = getFrames(mag, darts);
 	vector<Mat> framesAng = getFrames(ang, darts);
+	vector<Point> iPoints;
+	vector<circ> circs;
+	vector<Rect> accepted;
+	pair<circ,circ> board;
 
-	// for (int i = 0; i < accepted.size(); i++) {
-	// 	rectangle(out, Point(accepted[i].x, accepted[i].y), Point(accepted[i].x + accepted[i].width, accepted[i].y + accepted[i].height), Scalar( 255, 0, 0 ), 2);
-	// }
+	for (int i = 0; i < darts.size(); i++) {
+		iPoints = lineMain(image, framesAng[i], framesMag[i], darts[i]);
+		circs = circleMain(image, framesAng[i], framesMag[i], darts[i]);
+		int count = 0;
+		board = getCircPair(circs); //We assume only one dartboard per frame detected by viola jones
+		for (Point p : iPoints) {
+			if (inCirc(board.first.x, board.first.y, board.first.r * 0.1, p)) count++;
+		}
+		if (count > 10) {
+			Rect found(board.second.x-board.second.r, board.second.y-board.second.r, 2*board.second.r, 2*board.second.r);
+			found.x += darts[i].x;
+			found.y += darts[i].y;
+			accepted.push_back(found);
+			break;
+		}
+	}
+
+	for (int i = 0; i < accepted.size(); i++) {
+		rectangle(out, Point(accepted[i].x, accepted[i].y), Point(accepted[i].x + accepted[i].width, accepted[i].y + accepted[i].height), Scalar( 255, 0, 0 ), 2);
+	}
 	imwrite("accepted_frames.jpg", out);
     return 0;
 }
@@ -147,33 +169,21 @@ vector<Point> lineMain(Mat image, Mat &ang, Mat &mag, Rect pos) {
 		}
 	}
 	return iPoints;
-	// for (Point i : iPoints) {
-	// 	if (inCirc(image.cols/2, image.rows/2, 30, i)) {
-	// 		cout << i << " in range" << endl;
-	// 	} else {
-	// 		cout << i << " not in range" << endl;
-	// 	}
-	// }
-
-    // normalize(hspaceLine, hspaceLine, 0, 255, NORM_MINMAX);
-    // imwrite( "hspaceLine.jpg", hspaceLine );
-    // imwrite( "suppressLine.jpg", supHLine );
-	// imwrite( "lineDetected.jpg", image);
 }
 
 
 vector<circ> circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
 	Mat output_mag_norm;
 	normalize(mag, output_mag_norm, 0, 255, NORM_MINMAX);
+	// double max;
+	// minMaxIdx(mag, NULL,&max,NULL,NULL);
 	Mat output_thresholded;
 	thresholding(40, output_mag_norm, output_thresholded);
 	imwrite( "output_thresholded.jpg", output_thresholded );
 
-	// long ***hspace; //Want to change this to mat all the way through
 	int radius = 50;
 	int dims[3] = {ang.rows, ang.cols, radius};
 	Mat hspace = Mat(3, dims, CV_64F, Scalar(0));
-	// zeroHspace(hspace, dims);
 	houghCircle(output_thresholded, ang, radius, hspace); //Have create 3d hough mat
 	Mat output_hough;
 	output_hough.create(ang.size(), ang.type());
@@ -181,22 +191,6 @@ vector<circ> circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
 	vector< circ > circs;
 	circs = suppressCircles(hspace, 0.7, ang.cols, ang.rows, radius, 15, supH); //Suppress 3d hough mat
 	return circs;
-	// houghToMat(supH, output_hough, radius); //Take 3d hough mat to 2d hough mat
-	// Mat output_hough_norm;
-	// normalize(output_hough, output_hough_norm, 0, 255, NORM_MINMAX);
-
-	// imwrite( "output_hough.jpg", output_hough_norm);
-
-	// Mat output_circles;
-	// output_circles.create(ang.size(), ang.type());
-	// circleHighlight(supH, output_mag_norm, 18, radius);
-	// for (int x = 0; x < pos.width; x++){
-	// 	for (int y = 0; y < pos.height; y++){
-	// 		image.at<Vec3b>(y+pos.y,x+pos.x) = output_mag_norm.at<Vec3b>(y,x); 
-	// 	}
-	// }
-	
-	// imwrite( "output_circles.jpg", image);
 }
 
 //
@@ -224,7 +218,15 @@ bool circRatios(circ circs0, circ circs1) {
 	return false;
 }
 
-
+pair<circ,circ> getCircPair(vector<circ> circs) {
+	pair<circ,circ> out;
+	for (int i = 0; i < circs.size(); i++) {
+		for (int j = 0; j < circs.size(); j++) {
+			if (circRatios(circs[i], circs[j])) out = make_pair(circs[i], circs[j]);
+		}
+	}
+	return out;
+}
 
 //
 //
