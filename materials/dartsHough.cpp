@@ -39,6 +39,7 @@ vector<circ> circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos);
 vector<Mat> getFrames(Mat image, vector<Rect> det);
 bool circRatios(circ circs0, circ circs1);
 pair<circ,circ> getCircPair(vector<circ> circs);
+vector< lineS > getValidLines(vector< lineS> lines, pair<circ, circ> board, int &count, vector<Point> &iPoints);
 
 int pullNum(const char* name);
 bool rectIntersect(Rect r1, Rect r2, double thresh);
@@ -117,24 +118,29 @@ int main( int argc, const char** argv )
 		for (int x = 0; x < accepted.size(); x++) { //Check if detected region has been accepted at already
 			//Maybe re-write to allow for smaller valid circle pairs in same region to take precedence?
 			//So if we find new circles in same sport, but 
-			if (rectIntersect(darts[i], accepted[x], 0.2)) {
+			if (rectIntersect(darts[i], accepted[x], 0.1)) {
 				dupeFlag = true;
 				break;
 			}
 		}
-		if (dupeFlag) continue;
+		if (dupeFlag) continue; //Ignore frame if similar frame already accepted
 		lines = lineMain(image, framesAng[i], framesMag[i], darts[i]);
-        iPoints = getAllIntersects(lines);
+		if (lines.size() < 5) continue; //Ignore frame if not enough lines present
+        // iPoints = getAllIntersects(lines);
 		circs = circleMain(image, framesAng[i], framesMag[i], darts[i]);
+		if (circs.size() < 2) continue; //Ignore frame if not enough circles present
 		int count = 0;
 		board = getCircPair(circs); //We assume only one dartboard per frame detected by viola jones
-		for (Point p : iPoints) {
-			if (inCirc(board.first.x, board.first.y, board.first.r * 0.1, p)) count++; //Find way to remove lines that dont have an intersection
-		}
-		if (count > 10) {
+		if (board.first.r == -1) continue; //Ignore frame if wanted circle ratio not present
+		// for (Point p : iPoints) {
+		// 	if (inCirc(board.first.x, board.first.y, board.first.r * 0.1, p)) count++; //Find way to remove lines that dont have an intersection
+		// }
+		lines = getValidLines(lines, board, count, iPoints);
+		if (count > 15) {
 			Rect found(board.second.x-board.second.r, board.second.y-board.second.r, 2*board.second.r, 2*board.second.r);
 			found.x += darts[i].x;
 			found.y += darts[i].y;
+			cout << found << endl;
 			accepted.push_back(found);
 			circle(out, Point(board.first.x+darts[i].x, board.first.y+darts[i].y), board.first.r, Scalar(0, 255, 0), 2);
 			circle(out, Point(board.second.x+darts[i].x, board.second.y+darts[i].y), board.second.r, Scalar(0, 255, 0), 2);
@@ -188,7 +194,7 @@ vector< lineS > lineMain(Mat image, Mat &ang, Mat &mag, Rect pos) {
     Mat hspaceLine(Size(180, maxDistance*2), CV_64F, Scalar(0));
 	double max;
 	minMaxIdx(mag, NULL,&max,NULL,NULL);
-    houghLine(mag, ang, hspaceLine, max*0.5);
+    houghLine(mag, ang, hspaceLine, max*0.3);
 	// std::cout << maxDistance << '\n';
 
     Mat supHLine;
@@ -265,16 +271,31 @@ pair<circ,circ> getCircPair(vector<circ> circs) {
 	return out;
 }
 
-// vector< lineS > getValidLines(vector< lineS> lines, vector<circ> circs, int &count) {
-// 	vector<Point> iPoints; //Intersection points
-// 	for (int i = 0; i < lines.size(); i++) {
-// 		for (int j = i+1; j < lines.size(); j++) {
-// 			Point p1 = getIntersect(lines[i],lines[j]);
-// 			iPoints.push_back(p1);
-// 		}
-// 	}
-//     return iPoints;
-// }
+vector< lineS > getValidLines(vector< lineS> lines, pair<circ, circ> board, int &count, vector<Point> &iPoints) {
+	// vector<Point> iPoints; //Intersection points
+	bool added[lines.size()]; //Tracks if line is already tracked as accepted line
+	for (int i = 0; i < lines.size(); i++) added[i] = false; //Ensuring all elements start as false
+	count = 0;
+	vector<lineS> out;
+	for (int i = 0; i < lines.size(); i++) {
+		for (int j = i+1; j < lines.size(); j++) {
+			Point p1 = getIntersect(lines[i],lines[j]);
+			if (inCirc(board.first.x, board.first.y, board.first.r * 0.1, p1)) {
+				count++;
+				iPoints.push_back(p1);
+				if (!added[i]) {	//If we aren't already tracking this line, track it
+					out.push_back(lines[i]);
+					added[i] = true;
+				}
+				if (!added[j]) {
+					out.push_back(lines[j]);
+					added[j] = true;
+				}
+			}
+		}
+	}
+    return out;
+}
 
 //
 //
