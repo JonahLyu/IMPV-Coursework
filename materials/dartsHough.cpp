@@ -25,9 +25,15 @@ struct circ {
   int r = -1;
 } ;
 
+struct lineS {
+	double rho;
+	double a;
+	double b;
+} ;
+
 /** Function Headers */
 void houghSetup(Mat image, Mat &ang, Mat &mag);
-vector< tuple <double, double, double> > lineMain(Mat image, Mat &ang, Mat &mag, Rect pos);
+vector< lineS > lineMain(Mat image, Mat &ang, Mat &mag, Rect pos);
 vector<circ> circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos);
 
 vector<Mat> getFrames(Mat image, vector<Rect> det);
@@ -45,11 +51,11 @@ void conv(cv::Mat &input, Mat kernel, cv::Mat &convOutput);
 void grad(Mat &dx, Mat &dy, Mat &mag, Mat &ang);
 void houghLine(Mat &mag_thr, Mat &grad_ori, Mat &hspace, int threshold);
 void suppressLine(Mat &hspace, double bound,int suppRange, Mat &out);
-vector< tuple <double, double, double> > getLines(Mat &hspace);
-Point getIntersect(tuple <double, double, double> l1, tuple <double, double, double> l2);
+vector< lineS > getLines(Mat &hspace);
+Point getIntersect(lineS l1, lineS l2);
 bool inCirc(int centreX, int centreY, int radius, Point p1);
 void drawLine( Mat &out, double rho, double a, double b, Rect pos, Point center, int scalar);
-vector<Point> getAllIntersects(vector< tuple <double, double, double> > lines);
+vector<Point> getAllIntersects(vector< lineS > lines);
 //Circle Funcs
 void thresholding(double threshold, Mat &input, Mat &output);
 vector< circ > suppressCircles(Mat &hspace, double bound, int cols, int rows, int rad, int suppRange, Mat &out);
@@ -96,7 +102,7 @@ int main( int argc, const char** argv )
 	vector<Mat> frames = getFrames(image, darts);
 	vector<Mat> framesMag = getFrames(mag, darts);
 	vector<Mat> framesAng = getFrames(ang, darts);
-    vector<tuple <double, double, double>> lines;
+    vector<lineS> lines;
 	vector<Point> iPoints;
 	vector<circ> circs;
 	// vector<circ> acceptCirc;
@@ -123,7 +129,7 @@ int main( int argc, const char** argv )
 		int count = 0;
 		board = getCircPair(circs); //We assume only one dartboard per frame detected by viola jones
 		for (Point p : iPoints) {
-			if (inCirc(board.first.x, board.first.y, board.first.r * 0.1, p)) count++;
+			if (inCirc(board.first.x, board.first.y, board.first.r * 0.1, p)) count++; //Find way to remove lines that dont have an intersection
 		}
 		if (count > 10) {
 			Rect found(board.second.x-board.second.r, board.second.y-board.second.r, 2*board.second.r, 2*board.second.r);
@@ -134,7 +140,7 @@ int main( int argc, const char** argv )
 			circle(out, Point(board.second.x+darts[i].x, board.second.y+darts[i].y), board.second.r, Scalar(0, 255, 0), 2);
 			//Draw lines
             for (int j = 0; j < lines.size(); j++) {
-                drawLine(out, get<0>(lines[j]), get<1>(lines[j]),get<2>(lines[j]), darts[i], Point(board.first.x, board.first.y), found.width);
+                drawLine(out, lines[j].rho, lines[j].a, lines[j].b, darts[i], Point(board.first.x, board.first.y), found.width);
             }
             // for (Point p : iPoints) {
     		// 	line(out, Point(p.x+darts[i].x, p.y+darts[i].y), Point(p.x+darts[i].x+1, p.y+darts[i].y+1), Scalar(255,255,255), 2);
@@ -175,7 +181,7 @@ void houghSetup(Mat image, Mat &ang, Mat &mag) {
 
 
 
-vector< tuple <double, double, double> > lineMain(Mat image, Mat &ang, Mat &mag, Rect pos) {
+vector< lineS > lineMain(Mat image, Mat &ang, Mat &mag, Rect pos) {
 	//hough line core code
 
     maxDistance = sqrt(pow(mag.cols,2)+pow(mag.rows,2));
@@ -187,7 +193,7 @@ vector< tuple <double, double, double> > lineMain(Mat image, Mat &ang, Mat &mag,
 
     Mat supHLine;
     suppressLine(hspaceLine, 0.5, 15, supHLine);
-    vector< tuple <double, double, double> > lines;
+    vector< lineS > lines;
     lines = getLines(supHLine);
 	return lines;
 }
@@ -258,6 +264,17 @@ pair<circ,circ> getCircPair(vector<circ> circs) {
 	}
 	return out;
 }
+
+// vector< lineS > getValidLines(vector< lineS> lines, vector<circ> circs, int &count) {
+// 	vector<Point> iPoints; //Intersection points
+// 	for (int i = 0; i < lines.size(); i++) {
+// 		for (int j = i+1; j < lines.size(); j++) {
+// 			Point p1 = getIntersect(lines[i],lines[j]);
+// 			iPoints.push_back(p1);
+// 		}
+// 	}
+//     return iPoints;
+// }
 
 //
 //
@@ -449,7 +466,7 @@ float gradient(pair<Point, Point> line) {
 	return (p2.y - p1.y)/(p2.x-p1.x);
 }
 
-vector<Point> getAllIntersects(vector< tuple <double, double, double> > lines){
+vector<Point> getAllIntersects(vector< lineS	 > lines){
     vector<Point> iPoints; //Intersection points
 	for (int i = 0; i < lines.size(); i++) {
 		for (int j = i+1; j < lines.size(); j++) {
@@ -460,13 +477,13 @@ vector<Point> getAllIntersects(vector< tuple <double, double, double> > lines){
     return iPoints;
 };
 
-Point getIntersect(tuple <double, double, double> l1, tuple <double, double, double> l2){
-    double c1 = get<0>(l1);
-    double a1 = get<1>(l1);
-    double b1 = get<2>(l1);
-    double c2 = get<0>(l2);
-    double a2 = get<1>(l2);
-    double b2 = get<2>(l2);
+Point getIntersect(lineS l1, lineS l2){
+    double c1 = l1.rho;
+    double a1 = l1.a;
+    double b1 = l1.b;
+    double c2 = l2.rho;
+    double a2 = l2.a;
+    double b2 = l2.b;
     double det = a1*b2 - a2*b1;
     Point p;
     p.x = (b2*c1 - b1*c2) / det;
@@ -500,19 +517,19 @@ void drawLine( Mat &out, double rho, double a, double b, Rect pos, Point center,
 
 }
 
-vector< tuple <double, double, double> > getLines(Mat &hspace){
-	vector< tuple <double, double, double> > lines;
+vector< lineS > getLines(Mat &hspace){
+	vector< lineS > lines;
 	long max = 0;
 	// std::cout << "p\ttheta" << '\n';
 	for (int p = 0; p < hspace.rows; p++) {
 		for (int theta = 0; theta < hspace.cols; theta++) {
 			if (hspace.at<double>(p,theta) > 0){
 				// std::cout << p <<'\t'<<theta<< '\n';
-                double rho = p - maxDistance;
-                double a = cos(theta*M_PI/180);
-                double b = sin(theta*M_PI/180);
-				tuple <double, double, double> line = make_tuple(rho, a, b);
-				lines.push_back(line);
+				lineS l;
+                l.rho = p - maxDistance;
+                l.a = cos(theta*M_PI/180);
+                l.b = sin(theta*M_PI/180);
+				lines.push_back(l);
 			}
 		}
 	}
