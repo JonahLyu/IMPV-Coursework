@@ -27,7 +27,7 @@ struct circ {
 
 /** Function Headers */
 void houghSetup(Mat image, Mat &ang, Mat &mag);
-vector<Point> lineMain(Mat image, Mat &ang, Mat &mag, Rect pos);
+vector< tuple <double, double, double> > lineMain(Mat image, Mat &ang, Mat &mag, Rect pos);
 vector<circ> circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos);
 
 vector<Mat> getFrames(Mat image, vector<Rect> det);
@@ -45,9 +45,11 @@ void conv(cv::Mat &input, Mat kernel, cv::Mat &convOutput);
 void grad(Mat &dx, Mat &dy, Mat &mag, Mat &ang);
 void houghLine(Mat &mag_thr, Mat &grad_ori, Mat &hspace, int threshold);
 void suppressLine(Mat &hspace, double bound,int suppRange, Mat &out);
-vector< tuple <double, double, double> > lineHighlight(Mat &hspace, Mat &output);
+vector< tuple <double, double, double> > getLines(Mat &hspace);
 Point getIntersect(tuple <double, double, double> l1, tuple <double, double, double> l2);
 bool inCirc(int centreX, int centreY, int radius, Point p1);
+void drawLine( Mat &out, double rho, double a, double b, Rect pos, Point center);
+vector<Point> getAllIntersects(vector< tuple <double, double, double> > lines);
 //Circle Funcs
 void thresholding(double threshold, Mat &input, Mat &output);
 vector< circ > suppressCircles(Mat &hspace, double bound, int cols, int rows, int rad, int suppRange, Mat &out);
@@ -94,13 +96,15 @@ int main( int argc, const char** argv )
 	vector<Mat> frames = getFrames(image, darts);
 	vector<Mat> framesMag = getFrames(mag, darts);
 	vector<Mat> framesAng = getFrames(ang, darts);
+    vector<tuple <double, double, double>> lines;
 	vector<Point> iPoints;
 	vector<circ> circs;
 	vector<Rect> accepted;
 	pair<circ,circ> board;
 
 	for (int i = 0; i < darts.size(); i++) {
-		iPoints = lineMain(image, framesAng[i], framesMag[i], darts[i]);
+		lines = lineMain(image, framesAng[i], framesMag[i], darts[i]);
+        iPoints = getAllIntersects(lines);
 		circs = circleMain(image, framesAng[i], framesMag[i], darts[i]);
 		int count = 0;
 		board = getCircPair(circs); //We assume only one dartboard per frame detected by viola jones
@@ -115,6 +119,12 @@ int main( int argc, const char** argv )
 			circle(out, Point(board.first.x+darts[i].x, board.first.y+darts[i].y), board.first.r, Scalar(0, 255, 0), 2);
 			circle(out, Point(board.second.x+darts[i].x, board.second.y+darts[i].y), board.second.r, Scalar(0, 255, 0), 2);
 			//Draw lines
+            for (int j = 0; j < lines.size(); j++) {
+                drawLine(out, get<0>(lines[j]), get<1>(lines[j]),get<2>(lines[j]), darts[i], Point(board.first.x, board.first.y));
+            }
+            // for (Point p : iPoints) {
+    		// 	line(out, Point(p.x+darts[i].x, p.y+darts[i].y), Point(p.x+darts[i].x+1, p.y+darts[i].y+1), Scalar(255,255,255), 2);
+    		// }
 			break;
 		}
 	}
@@ -149,7 +159,9 @@ void houghSetup(Mat image, Mat &ang, Mat &mag) {
     grad(dxNonNorm, dyNonNorm, mag, ang);
 }
 
-vector<Point> lineMain(Mat image, Mat &ang, Mat &mag, Rect pos) {
+
+
+vector< tuple <double, double, double> > lineMain(Mat image, Mat &ang, Mat &mag, Rect pos) {
 	//hough line core code
 
     maxDistance = sqrt(pow(mag.cols,2)+pow(mag.rows,2));
@@ -162,16 +174,8 @@ vector<Point> lineMain(Mat image, Mat &ang, Mat &mag, Rect pos) {
     Mat supHLine;
     suppressLine(hspaceLine, 0.5, 15, supHLine);
     vector< tuple <double, double, double> > lines;
-    lines = lineHighlight(supHLine, image);
-	vector<Point> iPoints; //Intersection points
-	for (int i = 0; i < lines.size(); i++) {
-		for (int j = i+1; j < lines.size(); j++) {
-			Point p1 = getIntersect(lines[i],lines[j]);
-			iPoints.push_back(p1);
-    		line(image, p1, Point(p1.x+1, p1.y+1), Scalar(255,0,0), 3);
-		}
-	}
-	return iPoints;
+    lines = getLines(supHLine);
+	return lines;
 }
 
 
@@ -420,6 +424,17 @@ float gradient(pair<Point, Point> line) {
 	return (p2.y - p1.y)/(p2.x-p1.x);
 }
 
+vector<Point> getAllIntersects(vector< tuple <double, double, double> > lines){
+    vector<Point> iPoints; //Intersection points
+	for (int i = 0; i < lines.size(); i++) {
+		for (int j = i+1; j < lines.size(); j++) {
+			Point p1 = getIntersect(lines[i],lines[j]);
+			iPoints.push_back(p1);
+		}
+	}
+    return iPoints;
+};
+
 Point getIntersect(tuple <double, double, double> l1, tuple <double, double, double> l2){
     double c1 = get<0>(l1);
     double a1 = get<1>(l1);
@@ -435,7 +450,32 @@ Point getIntersect(tuple <double, double, double> l1, tuple <double, double, dou
 
 }
 
-vector< tuple <double, double, double> > lineHighlight(Mat &hspace, Mat &output){
+void drawLine( Mat &out, double rho, double a, double b, Rect pos, Point center){
+    // int scale = 1000;
+    // double x0 = rho * a + pos.x;
+    // double y0 = rho * b + pos.y;
+    // Point p1,p2;
+    // p1.x = x0 + scale*(-b);
+    // p1.y = y0 + scale*a;
+    // p2.x = x0 - scale*(-b);
+    // p2.y = y0 - scale*a;
+    // line(out, p1, p2, Scalar(0,0,255), 2);
+    //rho = ax+by
+    //x = (p-by)/a
+    //y = (p-ax)/b
+    Point p1,p2,p3,p4;
+    double x0 = center.x + pos.x;
+    double y0 = (rho-a * center.x)/b+ pos.y;
+    int scale = pos.width/2;
+    p1.x = x0 + scale*(-b);
+    p1.y = y0 + scale*a;
+    p2.x = x0 - scale*(-b);
+    p2.y = y0 - scale*a;
+    line(out, p1, p2, Scalar(0,0,255), 2);
+
+}
+
+vector< tuple <double, double, double> > getLines(Mat &hspace){
 	vector< tuple <double, double, double> > lines;
 	long max = 0;
 	// std::cout << "p\ttheta" << '\n';
@@ -446,14 +486,6 @@ vector< tuple <double, double, double> > lineHighlight(Mat &hspace, Mat &output)
                 double rho = p - maxDistance;
                 double a = cos(theta*M_PI/180);
                 double b = sin(theta*M_PI/180);
-                double x0 = rho * a;
-                double y0 = rho * b;
-                Point p1,p2;
-                p1.x = x0 + 1000*(-b);
-                p1.y = y0 + 1000*a;
-                p2.x = x0 - 1000*(-b);
-                p2.y = y0 - 1000*a;
-                line(output, p1, p2, Scalar(0,255,0), 3);
 				tuple <double, double, double> line = make_tuple(rho, a, b);
 				lines.push_back(line);
 			}

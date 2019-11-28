@@ -1,4 +1,4 @@
-.PHONY : face darts
+.PHONY : face darts dartsH
 fac = face.cpp
 dar = darts.cpp
 darH = dartsHough.cpp
