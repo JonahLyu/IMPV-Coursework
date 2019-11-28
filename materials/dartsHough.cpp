@@ -48,7 +48,7 @@ void suppressLine(Mat &hspace, double bound,int suppRange, Mat &out);
 vector< tuple <double, double, double> > getLines(Mat &hspace);
 Point getIntersect(tuple <double, double, double> l1, tuple <double, double, double> l2);
 bool inCirc(int centreX, int centreY, int radius, Point p1);
-void drawLine( Mat &out, double rho, double a, double b, Rect pos, Point center);
+void drawLine( Mat &out, double rho, double a, double b, Rect pos, Point center, int scalar);
 vector<Point> getAllIntersects(vector< tuple <double, double, double> > lines);
 //Circle Funcs
 void thresholding(double threshold, Mat &input, Mat &output);
@@ -107,6 +107,16 @@ int main( int argc, const char** argv )
 	//Dart3 has weird behaviour, may want to look at how we ignore regions, order regions by size maybe?
 	//Dart6 not detecting now? See if elipses get it
 	for (int i = 0; i < darts.size(); i++) {
+		dupeFlag = false;
+		for (int x = 0; x < accepted.size(); x++) { //Check if detected region has been accepted at already
+			//Maybe re-write to allow for smaller valid circle pairs in same region to take precedence?
+			//So if we find new circles in same sport, but 
+			if (rectIntersect(darts[i], accepted[x], 0.2)) {
+				dupeFlag = true;
+				break;
+			}
+		}
+		if (dupeFlag) continue;
 		lines = lineMain(image, framesAng[i], framesMag[i], darts[i]);
         iPoints = getAllIntersects(lines);
 		circs = circleMain(image, framesAng[i], framesMag[i], darts[i]);
@@ -124,12 +134,12 @@ int main( int argc, const char** argv )
 			circle(out, Point(board.second.x+darts[i].x, board.second.y+darts[i].y), board.second.r, Scalar(0, 255, 0), 2);
 			//Draw lines
             for (int j = 0; j < lines.size(); j++) {
-                drawLine(out, get<0>(lines[j]), get<1>(lines[j]),get<2>(lines[j]), darts[i], Point(board.first.x, board.first.y));
+                drawLine(out, get<0>(lines[j]), get<1>(lines[j]),get<2>(lines[j]), darts[i], Point(board.first.x, board.first.y), found.width);
             }
             // for (Point p : iPoints) {
     		// 	line(out, Point(p.x+darts[i].x, p.y+darts[i].y), Point(p.x+darts[i].x+1, p.y+darts[i].y+1), Scalar(255,255,255), 2);
     		// }
-			break;
+			// break;
 		}
 	}
 
@@ -465,7 +475,7 @@ Point getIntersect(tuple <double, double, double> l1, tuple <double, double, dou
 
 }
 
-void drawLine( Mat &out, double rho, double a, double b, Rect pos, Point center){
+void drawLine( Mat &out, double rho, double a, double b, Rect pos, Point center, int scalar){
     // int scale = 1000;
     // double x0 = rho * a + pos.x;
     // double y0 = rho * b + pos.y;
@@ -481,7 +491,7 @@ void drawLine( Mat &out, double rho, double a, double b, Rect pos, Point center)
     Point p1,p2,p3,p4;
     double x0 = center.x + pos.x;
     double y0 = (rho-a * center.x)/b+ pos.y;
-    int scale = pos.width/2;
+    int scale = scalar/2;
     p1.x = x0 + scale*(-b);
     p1.y = y0 + scale*a;
     p2.x = x0 - scale*(-b);
