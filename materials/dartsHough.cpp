@@ -20,9 +20,9 @@ using namespace std;
 using namespace cv;
 
 struct circ {
-  int x;
-  int y;
-  int r;
+  int x = -1;
+  int y = -1;
+  int r = -1;
 } ;
 
 /** Function Headers */
@@ -35,7 +35,7 @@ bool circRatios(circ circs0, circ circs1);
 pair<circ,circ> getCircPair(vector<circ> circs);
 
 int pullNum(const char* name);
-bool rectIntersect(Rect r1, Rect r2, int thresh);
+bool rectIntersect(Rect r1, Rect r2, double thresh);
 vector<Rect> getTruths( int index );
 vector<Rect> detectAndDisplay( Mat frame, vector<Rect> gt );
 void groundTruthDraw(Mat frame, vector<Rect> gt);
@@ -80,7 +80,7 @@ int main( int argc, const char** argv )
 	if( !cascade.load( cascade_name ) ){ printf("--(!)Error loading\n"); return -1; };
 
 	// 3. Detect Faces and Display Result
-	vector<Rect> darts = detectAndDisplay( frame, gt );
+	vector<Rect> darts = detectAndDisplay( frame, gt ); //Order darts into region sizes?
 	// vector<Mat> frames = getFrames(image, darts);
 	// Draw ground truth rectangles on image
 	groundTruthDraw(frame, gt);
@@ -96,10 +96,21 @@ int main( int argc, const char** argv )
 	vector<Mat> framesAng = getFrames(ang, darts);
 	vector<Point> iPoints;
 	vector<circ> circs;
+	// vector<circ> acceptCirc;
 	vector<Rect> accepted;
 	pair<circ,circ> board;
+	bool dupeFlag;
 
+	//Dart3 has weird behaviour, may want to look at how we ignore regions, order regions by size maybe?
+	//Dart6 not detecting now? See if elipses get it
 	for (int i = 0; i < darts.size(); i++) {
+		dupeFlag = false;
+		for (int x = 0; x < accepted.size(); x++) { //Check if detected region has been accepted at already
+			//Maybe re-write to allow for smaller valid circle pairs in same region to take precedence?
+			//So if we find new circles in same sport, but 
+			if (rectIntersect(darts[i], accepted[x], 0.2)) dupeFlag = true;
+		}
+		if (dupeFlag) continue;
 		iPoints = lineMain(image, framesAng[i], framesMag[i], darts[i]);
 		circs = circleMain(image, framesAng[i], framesMag[i], darts[i]);
 		int count = 0;
@@ -115,7 +126,8 @@ int main( int argc, const char** argv )
 			circle(out, Point(board.first.x+darts[i].x, board.first.y+darts[i].y), board.first.r, Scalar(0, 255, 0), 2);
 			circle(out, Point(board.second.x+darts[i].x, board.second.y+darts[i].y), board.second.r, Scalar(0, 255, 0), 2);
 			//Draw lines
-			break;
+			// break;
+
 		}
 	}
 
@@ -183,7 +195,8 @@ vector<circ> circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
 	Mat output_thresholded;
 	thresholding(40, output_mag_norm, output_thresholded);
 	imwrite( "output_thresholded.jpg", output_thresholded );
-	int radius = min(ang.rows, ang.cols); //The maximum radius circle that can be found
+	int radius = min(ang.rows, ang.cols); //The maximum radius circle that can be found may want to use max instead of min
+	// int radius = max(ang.rows, ang.cols); //The maximum radius circle that can be found
 	int dims[3] = {ang.rows, ang.cols, radius};
 	Mat hspace = Mat(3, dims, CV_64F, Scalar(0));
 	houghCircle(output_thresholded, ang, radius, hspace); //Have create 3d hough mat
@@ -213,18 +226,28 @@ bool circRatios(circ circs0, circ circs1) {
 	bool yFlag, xFlag, ratioFlag;
 	yFlag = (circs0.y > circs1.y-5) && (circs0.y < circs1.y+5);
 	xFlag = (circs0.x > circs1.x-5) && (circs0.x < circs1.x+5);
-	ratioFlag = (circs1.r <= circs0.r * 2.5) && (circs1.r >= circs0.r * 1.25);
+	ratioFlag = (circs1.r <= circs0.r * 2.5) && (circs1.r >= circs0.r * 1.25); //May want to increase 1.25 to 1.5
 	if (yFlag && xFlag && ratioFlag) {
 		return true;
 	}
 	return false;
 }
 
+//May want to ger pair with closest radius
 pair<circ,circ> getCircPair(vector<circ> circs) {
 	pair<circ,circ> out;
 	for (int i = 0; i < circs.size(); i++) {
 		for (int j = 0; j < circs.size(); j++) {
-			if (circRatios(circs[i], circs[j])) out = make_pair(circs[i], circs[j]);
+			// if (circRatios(circs[i], circs[j])) out = make_pair(circs[i], circs[j]);
+			if (circRatios(circs[i], circs[j])) {
+				if (out.first.r == -1) out = make_pair(circs[i], circs[j]); //Prioritses smallest circle pair discovered
+				else if (circs[i].r < out.first.r && circs[j].r < out.second.r) { //If smaller circle pair discovered, use them
+					out = make_pair(circs[i], circs[j]);
+				}
+				// else if (min(circs[i].r, circs[j].r)-max(circs[i].r, circs[j].r) < (min(out.first.r, out.second.r)-max(out.first.r, out.second.r))) {
+				// 	out = make_pair(circs[i], circs[j]);
+				// }
+			}
 		}
 	}
 	return out;
