@@ -31,6 +31,14 @@ struct lineS {
 	double b;
 } ;
 
+struct ellip {
+	int x;
+	int y;
+	int a;
+	int b;
+	int alpha; //Deg, will convert to rad when calculating
+} ;
+
 /** Function Headers */
 void houghSetup(Mat image, Mat &ang, Mat &mag);
 vector< lineS > lineMain(Mat image, Mat &ang, Mat &mag, Rect pos);
@@ -59,6 +67,11 @@ void drawLine( Mat &out, double rho, double a, double b, Rect pos, Point center,
 vector<Point> getAllIntersects(vector< lineS > lines);
 //Circle Funcs
 void thresholding(double threshold, Mat &input, Mat &output);
+vector< circ > suppressCircles(Mat &hspace, double bound, int cols, int rows, int rad, int suppRange, Mat &out);
+void houghCircle(Mat &mag_thr, Mat &grad_ori, int radius, Mat &hspace);
+void circleHighlight(Mat hough_array, Mat &output, int threshold, int radius);
+void houghToMat(Mat hough_array, Mat &output, int radius);
+//Ellipse Funcs
 vector< circ > suppressCircles(Mat &hspace, double bound, int cols, int rows, int rad, int suppRange, Mat &out);
 void houghCircle(Mat &mag_thr, Mat &grad_ori, int radius, Mat &hspace);
 void circleHighlight(Mat hough_array, Mat &output, int threshold, int radius);
@@ -108,6 +121,7 @@ int main( int argc, const char** argv )
 	vector<circ> circs;
 	// vector<circ> acceptCirc;
 	vector<Rect> accepted;
+	vector<Rect> potential;
 	pair<circ,circ> board;
 	bool dupeFlag;
 
@@ -129,7 +143,16 @@ int main( int argc, const char** argv )
 		if (circs.size() < 2) continue; //Ignore frame if not enough circles present
 		int count = 0;
 		board = getCircPair(circs); //We assume only one dartboard per frame detected by viola jones
-		if (board.first.r == -1) continue; //Ignore frame if wanted circle ratio not present
+
+		//If not enough lines, check if there enough intersections in close proximity, harsher than when combined with circle
+		//So loop through all intersections, see if when compared to all other intersections there are say 30 within
+		//close proximity. Maybe require lines intersecting have a different enough gradient to each other as well
+		//Maybe require intersectiong have at least a 10 degree difference in rotation.
+		//This could allow us to catch dartboards missed because they aren't circles
+
+		if (board.first.r == -1) {
+			continue; //Ignore frame if wanted circle ratio not present
+		}
 		// for (Point p : iPoints) {
 		// 	if (inCirc(board.first.x, board.first.y, board.first.r * 0.1, p)) count++; //Find way to remove lines that dont have an intersection
 		// }
@@ -150,8 +173,28 @@ int main( int argc, const char** argv )
     		// 	line(out, Point(p.x+darts[i].x, p.y+darts[i].y), Point(p.x+darts[i].x+1, p.y+darts[i].y+1), Scalar(255,255,255), 2);
     		// }
 			// break;
-		}
+		} //else { //Attempt to store all areas that potentially match a dartboard config
+		// 	Rect found(board.second.x-board.second.r, board.second.y-board.second.r, 2*board.second.r, 2*board.second.r);
+		// 	found.x += darts[i].x;
+		// 	found.y += darts[i].y;
+		// 	potential.push_back(found);
+		// }
 	}
+	//DON'T USE NOT USEFUL
+	// bool potFlag; //Would check if a area with correct circle ratios but not enough line intersections had been accepted, if not would accept area as dartboard
+	// for (int i = 0; i < potential.size(); i++) {
+	// 	potFlag = false;
+	// 	for (int j = 0; j < accepted.size(); j++) {
+	// 		if (rectIntersect(potential[i], accepted[j], 0.1)) {
+	// 			potFlag = true;
+	// 		}
+	// 	}
+	// 	if (potFlag) {
+	// 		potential.erase(potential.begin() + i--);
+	// 	} else {
+	// 		accepted.push_back(potential[i]);
+	// 	}
+	// }
 
 	for (int i = 0; i < accepted.size(); i++) {
 		rectangle(out, Point(accepted[i].x, accepted[i].y), Point(accepted[i].x + accepted[i].width, accepted[i].y + accepted[i].height), Scalar( 255, 0, 0 ), 2);
@@ -222,6 +265,26 @@ vector<circ> circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
 	return circs;
 }
 
+// vector<ellip> ellipseMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
+// 	Mat output_mag_norm;
+// 	normalize(mag, output_mag_norm, 0, 255, NORM_MINMAX);
+// 	double max;
+// 	minMaxIdx(output_mag_norm, NULL,&max,NULL,NULL);
+// 	Mat output_thresholded;
+// 	// thresholding(40, output_mag_norm, output_thresholded); //Alternate, can sorta detect dart3
+// 	thresholding(max*0.1, output_mag_norm, output_thresholded);
+// 	int radius = max(ang.rows, ang.cols); //The maximum radius circle that can be found may want to use max instead of min
+// 	// int radius = max(ang.rows, ang.cols); //The maximum radius circle that can be found
+// 				  //x			y		radius	scalar	angles
+// 	int dims[5] = {ang.rows, ang.cols, radius, radius, 180}; //only need 180 degrees of rotation as 360 would result in duplicate votes
+// 	Mat hspace = Mat(5, dims, CV_64F, Scalar(0));
+// 	houghEllipse(output_thresholded, ang, radius, hspace); //Have create 3d hough mat
+// 	Mat supH;
+// 	vector< circ > circs;
+// 	circs = suppressEllipses(hspace, 0.5, ang.cols, ang.rows, radius, 15, supH); //Suppress 3d hough mat
+// 	return circs;
+// }
+
 //
 //
 //
@@ -291,6 +354,10 @@ vector< lineS > getValidLines(vector< lineS> lines, pair<circ, circ> board, int 
 		}
 	}
     return out;
+}
+
+void intersectionTest(vector<lineS> lines, Rect pos) {
+	
 }
 
 //
@@ -735,3 +802,87 @@ void circleHighlight(Mat hough_array, Mat &output, int threshold, int radius){
 		}
 	}
 }
+
+// /////////////////////
+// //ELLIPSE FUNCTIONS//
+// /////////////////////
+
+// vector< ellip > suppressEllipses(Mat &hspace, double bound, int cols, int rows, int rad, int suppRange, Mat &out) {
+// 	vector< ellip > ellips;
+// 	int dims[5] = {rows, cols, rad, rad, 180};
+// 	out = Mat(5, dims, CV_64F);
+// 	if (bound > 1) {
+// 		cout << "bound needs to be 1 or less" << endl;
+// 		return ellips;
+// 	}
+// 	int maxIdx[3];
+// 	minMaxIdx(hspace, NULL, NULL, NULL, maxIdx);
+// 	double max = hspace.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]);
+// 	double loopMax = max;
+// 	ellip e;
+// 	// out.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]) = loopMax;
+// 	while (loopMax > bound * max) {
+// 		//y,x,r
+// 		e.x = maxIdx[1];
+// 		e.y = maxIdx[0];
+// 		e.r = maxIdx[2];
+// 		// circs.push_back(make_tuple(maxIdx[0],maxIdx[1],maxIdx[2]));
+// 		ellips.push_back(e);
+// 		out.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]) = loopMax;
+// 		for (int j = maxIdx[0] - suppRange; j < rows && j < maxIdx[0] + suppRange; j++) {
+// 			for (int i = maxIdx[1] - suppRange; i < cols && i < maxIdx[1] + suppRange; i++) {
+// 				for (int r = maxIdx[2] - suppRange; r < rad && r < maxIdx[2] + suppRange; r++) {
+// 					if (j < 0) j = 0;
+// 					if (i < 0) i = 0;
+// 					if (r < 0) r = 0;
+// 					hspace.at<long>(j,i,r) = 0;
+// 				}
+// 			}
+// 		}
+// 		// hMat = Mat(3, dims, CV_64F, hspace);
+// 		minMaxIdx(hspace, NULL, NULL, NULL, maxIdx);
+// 		loopMax = hspace.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]);
+// 	}
+// 	return ellips;
+// }
+
+// void houghEllipse(Mat &mag_thr, Mat &grad_ori, int radius, Mat &hspace){
+
+// 	// int x0[2], y0[2];
+// 	double valMag, valAng;
+// 	for (int y = 0; y < mag_thr.rows; y++) {
+// 		for (int x = 0; x < mag_thr.cols; x++) {
+// 			for (int r = 0; r < radius; r++) {
+// 				for (int s = 0; s < radius; s++) {
+// 					for (int a = 0; a < 180; a++) {
+// 						if (mag_thr.at<double>(y, x) > 0) {
+// 							valAng = grad_ori.at<double>(y,x);
+// 							//Ellipse equations here
+// 							for (int m = 0; m < 2; m++) {
+// 								for (int n = 0; n < 2; n++) {
+// 									bool f1 = (y0[n] > 0 && y0[n] < mag_thr.rows);
+// 									bool f2 = (x0[m] > 0 && x0[m] < mag_thr.cols);
+// 									if (f1 && f2) hspace.at<double>(y0[n],x0[m],r,s,a) += 1;
+// 								}
+// 							}
+// 						}
+// 					}
+// 				}
+// 			}
+// 		}
+// 	}
+// }
+
+// void houghToMatEllipse(Mat hough_array, Mat &output, int radius){
+// 	int rSum;
+// 	for (int y = 0; y < output.rows; y++) {
+// 		for (int x = 0; x < output.cols; x++) {
+// 			rSum = 0;
+// 			for (int r = 0; r < radius; r++) {
+// 				rSum += hough_array.at<double>(y,x,r);
+// 			}
+// 			output.at<double>(y,x) = rSum;
+// 		}
+// 	}
+
+// }
