@@ -123,22 +123,23 @@ int main( int argc, const char** argv )
 	vector<Mat> frames = getFrames(image, darts);
 	vector<Mat> framesMag = getFrames(mag, darts);
 	vector<Mat> framesAng = getFrames(ang, darts);
+
     vector<lineS> lines;
 	vector<Point> iPoints;
 	vector<circ> circs;
 	// vector<circ> acceptCirc;
-	vector<Rect> lineChecks;
+	// vector<Rect> lineChecks;
 	vector<Rect> accepted;
 	vector<Rect> potential;
 	pair<circ,circ> board;
 	bool dupeFlag;
-	for (int i = 0; i < darts.size(); i++) lineChecks.push_back(darts[i]);
-	int size = lineChecks.size();
-	for( int i = 0; i < size; i++ )
-	{
-		lineChecks.push_back(Rect(lineChecks[i]));
-	}
-	groupRectangles(lineChecks, 1, 0.5);
+	// for (int i = 0; i < darts.size(); i++) lineChecks.push_back(darts[i]);
+	// int size = lineChecks.size();
+	// for( int i = 0; i < size; i++ )
+	// {
+	// 	lineChecks.push_back(Rect(lineChecks[i]));
+	// }
+	// groupRectangles(lineChecks, 1, 0.5);
 	//Dart3 has weird behaviour, may want to look at how we ignore regions, order regions by size maybe?
 	//Dart6 not detecting now? See if elipses get it
 	for (int i = 0; i < darts.size(); i++) {
@@ -160,7 +161,7 @@ int main( int argc, const char** argv )
 
 		if (board.first.r == -1) {
 			iPoints = getAllIntersects(lines);
-			if (i > size) continue;
+			// if (i > size) continue;
 			if (checkClosePoints(darts[i], iPoints, darts[i].width * 0.1, 10, 5)) {
 				// cout << found << endl;
 				potential.push_back(darts[i]);
@@ -185,13 +186,13 @@ int main( int argc, const char** argv )
             }
 			continue;
 		}
+		//Guess that conecentric circles indicate potential dartboard
 		Rect found(board.second.x-board.second.r, board.second.y-board.second.r, 2*board.second.r, 2*board.second.r);
 		found.x += darts[i].x;
 		found.y += darts[i].y;
 		// cout << found << endl;
 		potential.push_back(found);
 	}
-	//DON'T USE NOT USEFUL
 	bool potFlag; //Would check if a area with correct circle ratios but not enough line intersections had been accepted, if not would accept area as dartboard
 	for (int i = 0; i < potential.size(); i++) {
 		potFlag = false;
@@ -238,8 +239,6 @@ void houghSetup(Mat image, Mat &ang, Mat &mag) {
     grad(dxNonNorm, dyNonNorm, mag, ang);
 }
 
-
-
 vector< lineS > lineMain(Mat image, Mat &ang, Mat &mag, Rect pos) {
 	//hough line core code
 
@@ -256,7 +255,6 @@ vector< lineS > lineMain(Mat image, Mat &ang, Mat &mag, Rect pos) {
     lines = getLines(supHLine);
 	return lines;
 }
-
 
 vector<circ> circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
 	Mat output_mag_norm;
