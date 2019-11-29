@@ -31,10 +31,10 @@ struct lineS {
 } ;
 
 struct ellip {
-	int x;
-	int y;
-	int a;
-	int b;
+	int x = -1;
+	int y = -1;
+	int a = -1;
+	int b = -1;
 } ;
 
 /** Function Headers */
@@ -48,6 +48,10 @@ bool circRatios(circ circs0, circ circs1);
 pair<circ,circ> getCircPair(vector<circ> circs);
 vector< lineS > getValidLines(vector< lineS> lines, pair<circ, circ> board, int &count, vector<Point> &iPoints);
 bool intersectionTest(vector<lineS> &lines, Rect pos);
+bool ellipRatios(ellip ellips0, ellip ellips1);
+pair<ellip,ellip> getEllipPair(vector<ellip> ellips);
+vector< lineS > getValidLinesEllip(vector< lineS> lines, pair<ellip, ellip> board, int &count, vector<Point> &iPoints);
+void ellipseChecks(vector<ellip> ellips, vector<lineS> lines, Rect frame, vector<Rect> &accepted, Mat &out);
 
 int pullNum(const char* name);
 bool rectIntersect(Rect r1, Rect r2, double thresh);
@@ -112,7 +116,7 @@ int main( int argc, const char** argv )
 	Mat mag;
 	Mat ang;
 	houghSetup(image, ang, mag);
-	ellipseMain(image, ang, mag, Rect(0,0,50,50));
+	// ellipseMain(image, ang, mag, Rect(0,0,50,50));
 	Mat output_mag;
 	vector<Mat> frames = getFrames(image, darts);
 	vector<Mat> framesMag = getFrames(mag, darts);
@@ -152,7 +156,8 @@ int main( int argc, const char** argv )
 		//This could allow us to catch dartboards missed because they aren't circles
 
 		if (board.first.r == -1) {
-			// ellipseCheck()
+			// cout << lines.size() << endl;
+			if (lines.size() > 10) ellipseChecks(ellipseMain(image, framesAng[i], framesMag[i], darts[i]), lines, darts[i], accepted, out);
 			continue; //Ignore frame if wanted circle ratio not present
 		}
 		// for (Point p : iPoints) {
@@ -171,16 +176,11 @@ int main( int argc, const char** argv )
             for (int j = 0; j < lines.size(); j++) {
                 drawLine(out, lines[j].rho, lines[j].a, lines[j].b, darts[i], Point(board.first.x, board.first.y), found.width);
             }
-            // for (Point p : iPoints) {
-    		// 	line(out, Point(p.x+darts[i].x, p.y+darts[i].y), Point(p.x+darts[i].x+1, p.y+darts[i].y+1), Scalar(255,255,255), 2);
-    		// }
-			// break;
-		} //else { //Attempt to store all areas that potentially match a dartboard config
-		// 	Rect found(board.second.x-board.second.r, board.second.y-board.second.r, 2*board.second.r, 2*board.second.r);
-		// 	found.x += darts[i].x;
-		// 	found.y += darts[i].y;
-		// 	potential.push_back(found);
-		// }
+			continue;
+		}
+		// cout << lines.size() << endl;
+		if (lines.size() > 10) ellipseChecks(ellipseMain(image, framesAng[i], framesMag[i], darts[i]), lines, darts[i], accepted, out);
+		// ellipseChecks(ellipseMain(image, framesAng[i], framesMag[i], darts[i]), lines, darts[i], accepted, out);
 	}
 	//DON'T USE NOT USEFUL
 	// bool potFlag; //Would check if a area with correct circle ratios but not enough line intersections had been accepted, if not would accept area as dartboard
@@ -241,7 +241,7 @@ vector< lineS > lineMain(Mat image, Mat &ang, Mat &mag, Rect pos) {
 	// std::cout << maxDistance << '\n';
 
     Mat supHLine;
-    suppressLine(hspaceLine, 0.5, 15, supHLine);
+    suppressLine(hspaceLine, 0.2, 15, supHLine);
     vector< lineS > lines;
     lines = getLines(supHLine);
 	return lines;
@@ -293,10 +293,10 @@ vector<ellip> ellipseMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
 
 	// normalize(output_hough_norm, output_hough_norm, 0, 255, NORM_MINMAX);
 	// imwrite( "output_hough.jpg", output_hough_norm);
-	
+
 	Mat supH;
 	vector< ellip > ellips;
-	ellips = suppressEllipses(hspace, 0.8, ang.cols, ang.rows, radiusX, radiusY, 15, supH); //Suppress 4d hough mat
+	ellips = suppressEllipses(hspace, 0.5, ang.cols, ang.rows, radiusX, radiusY, 15, supH); //Suppress 4d hough mat
 	return ellips;
 }
 
@@ -371,37 +371,90 @@ vector< lineS > getValidLines(vector< lineS> lines, pair<circ, circ> board, int 
     return out;
 }
 
-// bool intersectionTest(vector<lineS> &lines, Rect pos) {
-// 	vector<lineS> out;
-// 	vector<Point> intersect;
-// 	for (int i = 0; i < lines.size(); i++) {
-// 		intersect.clear();
-// 		for (int j = 0; j < lines.size(); j++) {
-// 			Point p1 = getIntersect(lines[i],lines[j]);
-// 			double grad1 = (-lines[i].a)/lines[i].b;
-// 			double grad2 = (-lines[j].a)/lines[j].b;
-// 			double ang1 = atan(grad1) * 180/M_PI;
-// 			double ang2 = atan(grad2) * 180/M_PI;
-// 			if (fabs(ang1-ang2) > 5) intersect.push_back(p1);
-// 		}
-// 		int points[intersect.size()];
-// 		for (int n = 0; n < intersect.size(); n++) points[n] = 0;
-// 		for (int x = 0; x < intersect.size(); x++) {
-// 			for (int y = x; y < intersect.size(); y++) {
-// 				if (fabs(intersect[x].x - intersect[y].x) < pos.width && fabs(intersect[x].y - intersect[y].y) < pos.width) {
-// 					points[x]++;
-// 				}
-// 			}
-// 		}
-// 		int count = 0;
-// 		for (int z = 0; z < intersect.size(); z++) {
-// 			if (points[z] > lines.size()/2) count++;
-// 		}
-// 		if (count > lines.size()/2) out.push_back(lines[i]);
-// 	}
-// 	lines = out;
-// 	return lines.size() > 1;
-// }
+bool ellipRatios(ellip ellips0, ellip ellips1) {
+	//circs0 assumed to be inner when checking
+	bool yFlag, xFlag, ratioFlagA, ratioFlagB;
+	yFlag = (ellips0.y > ellips1.y-5) && (ellips0.y < ellips1.y+5);
+	xFlag = (ellips0.x > ellips1.x-5) && (ellips0.x < ellips1.x+5);
+	ratioFlagA = (ellips1.a <= ellips0.a * 2.5) && (ellips1.a > ellips0.a * 1); //May want to increase 1.25 to 1.5
+	ratioFlagB = (ellips1.b <= ellips0.b * 2.5) && (ellips1.b > ellips0.b * 1);
+	if (yFlag && xFlag && ratioFlagA && ratioFlagB) {
+		return true;
+	}
+	return false;
+}
+
+pair<ellip,ellip> getEllipPair(vector<ellip> ellips) {
+	pair<ellip,ellip> out;
+	for (int i = 0; i < ellips.size(); i++) {
+		for (int j = 0; j < ellips.size(); j++) {
+			// if (circRatios(circs[i], circs[j])) out = make_pair(circs[i], circs[j]);
+			if (ellipRatios(ellips[i], ellips[j])) {
+				if (out.first.a == -1) out = make_pair(ellips[i], ellips[j]); //Prioritses smallest circle pair discovered
+				else if ((ellips[i].a < out.first.a || ellips[j].a < out.second.a) && (ellips[i].b < out.first.b || ellips[j].b < out.second.b)) { //If smaller circle pair discovered, use them
+					out = make_pair(ellips[i], ellips[j]);
+				}
+			}
+		}
+	}
+	return out;
+}
+
+vector< lineS > getValidLinesEllip(vector< lineS> lines, pair<ellip, ellip> board, int &count, vector<Point> &iPoints) {
+	// vector<Point> iPoints; //Intersection points
+	bool added[lines.size()]; //Tracks if line is already tracked as accepted line
+	for (int i = 0; i < lines.size(); i++) added[i] = false; //Ensuring all elements start as false
+	count = 0;
+	vector<lineS> out;
+	for (int i = 0; i < lines.size(); i++) {
+		for (int j = i+1; j < lines.size(); j++) {
+			Point p1 = getIntersect(lines[i],lines[j]);
+			if (inCirc(board.first.x, board.first.y, max(board.first.a, board.first.b) * 0.1, p1)) {
+				count++;
+				iPoints.push_back(p1);
+				if (!added[i]) {	//If we aren't already tracking this line, track it
+					out.push_back(lines[i]);
+					added[i] = true;
+				}
+				if (!added[j]) {
+					out.push_back(lines[j]);
+					added[j] = true;
+				}
+			}
+		}
+	}
+    return out;
+}
+
+void ellipseChecks(vector<ellip> ellips, vector<lineS> lines, Rect frame, vector<Rect> &accepted, Mat &out) {
+	vector<Point> iPoints;
+	//Issue could be here
+	pair<ellip, ellip> board = getEllipPair(ellips);
+	// cout << lines.size() << endl;
+	if (board.first.a == -1) {
+		// rectangle(out, Point(frame.x, frame.y), Point(frame.x + frame.width, frame.y + frame.height), Scalar( 255, 0, 0 ), 2);
+		return;
+	}
+	int count;
+	//Issue could be here
+	lines = getValidLinesEllip(lines, board, count, iPoints);
+	// cout << count << " c" << endl;
+	// rectangle(out, Point(frame.x, frame.y), Point(frame.x + frame.width, frame.y + frame.height), Scalar( 0, 0, 255 ), 2);
+	if (count > 10) {
+		Rect found(board.second.x-board.second.a, board.second.y-board.second.b, 2*board.second.a, 2*board.second.b);
+		found.x += frame.x;
+		found.y += frame.y;
+		cout << found << endl;
+		accepted.push_back(found);
+		//How to draw ellipse?
+		// circle(out, Point(board.first.x+darts[i].x, board.first.y+darts[i].y), board.first.r, Scalar(0, 255, 0), 2);
+		// circle(out, Point(board.second.x+darts[i].x, board.second.y+darts[i].y), board.second.r, Scalar(0, 255, 0), 2);
+		//Draw lines
+        for (int j = 0; j < lines.size(); j++) {
+            drawLine(out, lines[j].rho, lines[j].a, lines[j].b, frame, Point(board.first.x, board.first.y), found.width);
+        }
+	}
+}
 
 //
 //
