@@ -69,6 +69,7 @@ Point getIntersect(lineS l1, lineS l2);
 bool inCirc(int centreX, int centreY, int radius, Point p1);
 void drawLine( Mat &out, double rho, double a, double b, Rect pos, Point center, int scalar);
 vector<Point> getAllIntersects(vector< lineS > lines);
+void thresholdingLine(Mat &mag, Mat &mag_threshold);
 //Circle Funcs
 void thresholding(double threshold, Mat &input, Mat &output);
 vector< circ > suppressCircles(Mat &hspace, double bound, int cols, int rows, int rad, int suppRange, Mat &out);
@@ -85,6 +86,7 @@ String cascade_name = "dartcascade/cascade.xml";
 CascadeClassifier cascade;
 
 int maxDistance;
+int precision = 4;
 
 /** @function main */
 int main( int argc, const char** argv )
@@ -155,11 +157,11 @@ int main( int argc, const char** argv )
 		//Maybe require intersectiong have at least a 10 degree difference in rotation.
 		//This could allow us to catch dartboards missed because they aren't circles
 
-		if (board.first.r == -1) {
-			// cout << lines.size() << endl;
-			if (lines.size() > 10) ellipseChecks(ellipseMain(image, framesAng[i], framesMag[i], darts[i]), lines, darts[i], accepted, out);
-			continue; //Ignore frame if wanted circle ratio not present
-		}
+		// if (board.first.r == -1) {
+		// 	// cout << lines.size() << endl;
+		// 	if (lines.size() > 10) ellipseChecks(ellipseMain(image, framesAng[i], framesMag[i], darts[i]), lines, darts[i], accepted, out);
+		// 	continue; //Ignore frame if wanted circle ratio not present
+		// }
 		// for (Point p : iPoints) {
 		// 	if (inCirc(board.first.x, board.first.y, board.first.r * 0.1, p)) count++; //Find way to remove lines that dont have an intersection
 		// }
@@ -179,7 +181,7 @@ int main( int argc, const char** argv )
 			continue;
 		}
 		// cout << lines.size() << endl;
-		if (lines.size() > 10) ellipseChecks(ellipseMain(image, framesAng[i], framesMag[i], darts[i]), lines, darts[i], accepted, out);
+		// if (lines.size() > 10) ellipseChecks(ellipseMain(image, framesAng[i], framesMag[i], darts[i]), lines, darts[i], accepted, out);
 		// ellipseChecks(ellipseMain(image, framesAng[i], framesMag[i], darts[i]), lines, darts[i], accepted, out);
 	}
 	//DON'T USE NOT USEFUL
@@ -234,14 +236,14 @@ vector< lineS > lineMain(Mat image, Mat &ang, Mat &mag, Rect pos) {
 	//hough line core code
 
     maxDistance = sqrt(pow(mag.cols,2)+pow(mag.rows,2));
-    Mat hspaceLine(Size(180, maxDistance*2), CV_64F, Scalar(0));
-	double max;
-	minMaxIdx(mag, NULL,&max,NULL,NULL);
-    houghLine(mag, ang, hspaceLine, max*0.3);
+    Mat hspaceLine(Size(180*precision, maxDistance*2), CV_64F, Scalar(0));
+    Mat mag_threshold;
+    thresholdingLine(mag, mag_threshold);
+    houghLine(mag_threshold, ang, hspaceLine, 0);
 	// std::cout << maxDistance << '\n';
 
     Mat supHLine;
-    suppressLine(hspaceLine, 0.2, 15, supHLine);
+    suppressLine(hspaceLine, 0.5, 10*precision, supHLine);
     vector< lineS > lines;
     lines = getLines(supHLine);
 	return lines;
@@ -281,12 +283,12 @@ vector<ellip> ellipseMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
 	int dims[4] = {ang.rows, ang.cols, radiusX, radiusY}; //only need 180 degrees of rotation as 360 would result in duplicate votes
 	Mat hspace = Mat(4, dims, CV_64F);
 	houghEllipse(output_thresholded, ang, radiusX, radiusY, hspace); //Have create 4d hough mat
-	
+
 	//Draw hough space
 	// int dims2[2] = {ang.rows, ang.cols};
 	// Mat output_hough_norm = Mat(2, dims2, CV_64F);
 	// houghToMatEllipse(hspace, output_hough_norm, radiusX, radiusY);
-	
+
 	// double m;
 	// minMaxIdx(output_hough_norm, NULL,&m,NULL,NULL);
 	// cout << m << endl;
@@ -673,15 +675,6 @@ Point getIntersect(lineS l1, lineS l2){
 }
 
 void drawLine( Mat &out, double rho, double a, double b, Rect pos, Point center, int scalar){
-    // int scale = 1000;
-    // double x0 = rho * a + pos.x;
-    // double y0 = rho * b + pos.y;
-    // Point p1,p2;
-    // p1.x = x0 + scale*(-b);
-    // p1.y = y0 + scale*a;
-    // p2.x = x0 - scale*(-b);
-    // p2.y = y0 - scale*a;
-    // line(out, p1, p2, Scalar(0,0,255), 2);
     //rho = ax+by
     //x = (p-by)/a
     //y = (p-ax)/b
@@ -707,8 +700,8 @@ vector< lineS > getLines(Mat &hspace){
 				// std::cout << p <<'\t'<<theta<< '\n';
 				lineS l;
                 l.rho = p - maxDistance;
-                l.a = cos(theta*M_PI/180);
-                l.b = sin(theta*M_PI/180);
+                l.a = cos(theta/precision*M_PI/180);
+                l.b = sin(theta/precision*M_PI/180);
 				lines.push_back(l);
 			}
 		}
@@ -745,13 +738,28 @@ void suppressLine(Mat &hspace, double bound,int suppRange, Mat &out) {
 	}
 }
 
+void thresholdingLine(Mat &mag, Mat &mag_threshold){
+    mag_threshold.create(mag.size(), mag.type());
+    double max;
+	minMaxIdx(mag, NULL,&max,NULL,NULL);
+    double threshold = max*0.5;
+    for (int y = 0; y < mag.rows; y++) {
+        for (int x = 0; x < mag.cols; x++) {
+            if (mag.at<double>(y,x) > threshold){
+                mag_threshold.at<double>(y,x) = 255;
+            }
+            else mag_threshold.at<double>(y,x) = 0;
+        }
+    }
+}
+
 void houghLine(Mat &mag, Mat &ang, Mat &hspace, int threshold){
 
 	for (int y = 0; y < mag.rows; y++) {
 		for (int x = 0; x < mag.cols; x++) {
 			if (mag.at<double>(y, x) > threshold) {
-                for (int theta = 0; theta < 180; theta+=1){
-    				double p = x * cos(theta*M_PI/180) + y * sin(theta*M_PI/180);
+                for (int theta = 0; theta < 180*precision; theta+=1){
+    				double p = x * cos(theta/precision*M_PI/180) + y * sin(theta/precision*M_PI/180);
                     if (p < hspace.rows && theta < hspace.cols){
                         hspace.at<double>(p+maxDistance, theta) += 1;
                     }

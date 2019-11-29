@@ -24,16 +24,37 @@ void thresholdingLine(Mat &mag, Mat &mag_threshold){
     double max;
 	minMaxIdx(mag, NULL,&max,NULL,NULL);
     std::cout << "max: " << max << '\n';
-    double threshold = max*0.5;
+    double bound = 0.5;
+    double threshold = max*bound;
+    int count = 0;
     for (int y = 0; y < mag.rows; y++) {
         for (int x = 0; x < mag.cols; x++) {
             if (mag.at<double>(y,x) > threshold){
                 mag_threshold.at<double>(y,x) = 255;
+                count++;
             }
             else mag_threshold.at<double>(y,x) = 0;
         }
     }
 
+    while (count > 0.2 * mag.cols*mag.rows){
+        printf("not pass %.3f\n", (float)count/(mag.cols*mag.rows));
+        bound += 0.05;
+        threshold = max*bound;
+        count = 0;
+        for (int y = 0; y < mag.rows; y++) {
+            for (int x = 0; x < mag.cols; x++) {
+                if (mag.at<double>(y,x) > threshold){
+                    mag_threshold.at<double>(y,x) = 255;
+                    count++;
+                }
+                else mag_threshold.at<double>(y,x) = 0;
+            }
+        }
+    }
+    printf("pass %.3f\n", (float)count/(mag.cols*mag.rows));
+    std::cout << mag.cols*mag.rows << '\n';
+    std::cout << count << '\n';
 }
 
 int main( int argc, char** argv ){
@@ -42,11 +63,14 @@ int main( int argc, char** argv ){
 
     Mat image;
     image = imread( imageName, 1 );
-    // image = image(Rect(134, 52, 90, 200));//12
     // image = image(Rect(154, 72, 66, 146));//12
     // image = image(Rect(325, 151, 66, 68)); //3
+    // image = image(Rect(203, 112, 78, 75)); //6
     // image = image(Rect(61, 251, 76, 96)); //8
     // image = image(Rect(195, 38, 248, 248));//9
+    // image = image(Rect(912, 146, 41, 75)); //10
+    // image = image(Rect(578, 127, 67, 89)); //10
+    // image = image(Rect(91, 103, 103, 115)); //10
     // image = image(Rect(161, 85, 95, 101)); //11
     image = image(Rect(269, 119, 139, 136)); //13
 
@@ -96,7 +120,7 @@ int main( int argc, char** argv ){
 		for (int j = i+1; j < lines.size(); j++) {
 			Point p1 = getIntersect(lines[i],lines[j]);
 			iPoints.push_back(p1);
-    		line(image, p1, Point(p1.x+1, p1.y+1), Scalar(255,0,0), 3);
+    		line(image, p1, Point(p1.x+1, p1.y+1), Scalar(255,0,0), 2);
 		}
 	}
 	// for (Point i : iPoints) {
@@ -171,7 +195,7 @@ vector< tuple <double, double, double> > lineHighlight(Mat &hspace, Mat &output)
                 p1.y = y0 + 1000*a;
                 p2.x = x0 - 1000*(-b);
                 p2.y = y0 - 1000*a;
-                line(output, p1, p2, Scalar(0,255,0), 3);
+                line(output, p1, p2, Scalar(0,255,0), 2);
 				tuple <double, double, double> line = make_tuple(rho, a, b);
 				lines.push_back(line);
 			}
@@ -195,7 +219,8 @@ void suppressLine(Mat &hspace, double bound,int suppRange, Mat &out) {
 	double loopMax = max;
 	// // out.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]) = loopMax;
 	while (loopMax > bound * max) {
-		out.at<double>(maxIdx[0],maxIdx[1]) = 255;
+		out.at<double>(maxIdx[0],maxIdx[1]) = loopMax;
+        std::cout << "loopmax: "<< loopMax << '\n';
 		for (int j = maxIdx[0] - suppRange; j < tempHspace.rows && j < maxIdx[0] + suppRange; j++) {
 			for (int i = maxIdx[1] - suppRange; i < tempHspace.cols && i < maxIdx[1] + suppRange; i++) {
 				if (j < 0) j = 0;

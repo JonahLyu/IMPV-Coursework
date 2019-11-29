@@ -40,7 +40,7 @@ void suppress(Mat &hspace, double bound, int cols, int rows, int rad, int suppRa
 		out.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]) = loopMax;
 		for (int j = maxIdx[0] - suppRange; j < rows && j < maxIdx[0] + suppRange; j++) {
 			for (int i = maxIdx[1] - suppRange; i < cols && i < maxIdx[1] + suppRange; i++) {
-				for (int r = maxIdx[2] - suppRange; r < rad && r < maxIdx[2] + suppRange; r++) {
+				for (int r = maxIdx[2] - 12; r < rad && r < maxIdx[2] + 12; r++) {
 					if (j < 0) j = 0;
 					if (i < 0) i = 0;
 					if (r < 0) r = 0;
@@ -51,7 +51,7 @@ void suppress(Mat &hspace, double bound, int cols, int rows, int rad, int suppRa
 		// hMat = Mat(3, dims, CV_64F, hspace);
 		minMaxIdx(hspace, NULL, NULL, NULL, maxIdx);
 		loopMax = hspace.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]);
-	}	
+	}
 }
 
 long ***malloc3dArray(int dim1, int dim2, int dim3)
@@ -175,6 +175,7 @@ int main( int argc, char** argv )
 
  Mat image;
  image = imread( imageName, 1 );
+ image = image(Rect(193, 102, 88, 85)); //6
 
  if( argc != 2 || !image.data )
  {
