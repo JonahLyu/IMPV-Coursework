@@ -20,12 +20,37 @@ vector< tuple <double, double, double> > lineHighlight(Mat &hspace, Mat &output)
 Point getIntersect(tuple <double, double, double> l1, tuple <double, double, double> l2);
 bool inCirc(int centreX, int centreY, int radius, Point p1);
 
+void thresholdingLine(Mat &mag, Mat &mag_threshold){
+    double max;
+	minMaxIdx(mag, NULL,&max,NULL,NULL);
+    std::cout << "max: " << max << '\n';
+    double threshold = max*0.5;
+    for (int y = 0; y < mag.rows; y++) {
+        for (int x = 0; x < mag.cols; x++) {
+            if (mag.at<double>(y,x) > threshold){
+                mag_threshold.at<double>(y,x) = 255;
+            }
+            else mag_threshold.at<double>(y,x) = 0;
+        }
+    }
+
+}
+
 int main( int argc, char** argv ){
     // LOADING THE IMAGE
     char* imageName = argv[1];
 
     Mat image;
     image = imread( imageName, 1 );
+    // image = image(Rect(134, 52, 90, 200));//12
+    // image = image(Rect(154, 72, 66, 146));//12
+    // image = image(Rect(325, 151, 66, 68)); //3
+    // image = image(Rect(61, 251, 76, 96)); //8
+    // image = image(Rect(195, 38, 248, 248));//9
+    // image = image(Rect(161, 85, 95, 101)); //11
+    image = image(Rect(269, 119, 139, 136)); //13
+
+
 
     if( argc != 2 || !image.data ){
         printf( " No image data \n " );
@@ -56,11 +81,14 @@ int main( int argc, char** argv ){
 
     //hough line core code
     maxDistance = sqrt(pow(mag.cols,2)+pow(mag.rows,2));
-    Mat hspaceLine(Size(180, maxDistance*2), CV_64F, Scalar(0));
-    houghLine(mag, ang, hspaceLine, 200);
+    Mat hspaceLine(Size(720, maxDistance*2), CV_64F, Scalar(0));
+    Mat mag_threshold;
+    mag_threshold.create(mag.size(), mag.type());
+    thresholdingLine(mag, mag_threshold);
+    houghLine(mag_threshold, ang, hspaceLine, 0);
 
     Mat supHLine;
-    suppressLine(hspaceLine, 0.5, 20, supHLine);
+    suppressLine(hspaceLine, 0.5, 40, supHLine);
     vector< tuple <double, double, double> > lines;
     lines = lineHighlight(supHLine, image);
 	vector<Point> iPoints; //Intersection points
@@ -71,13 +99,13 @@ int main( int argc, char** argv ){
     		line(image, p1, Point(p1.x+1, p1.y+1), Scalar(255,0,0), 3);
 		}
 	}
-	for (Point i : iPoints) {
-		if (inCirc(image.cols/2, image.rows/2, 30, i)) {
-			cout << i << " in range" << endl;
-		} else {
-			cout << i << " not in range" << endl;
-		}
-	}
+	// for (Point i : iPoints) {
+	// 	if (inCirc(image.cols/2, image.rows/2, 30, i)) {
+	// 		cout << i << " in range" << endl;
+	// 	} else {
+	// 		cout << i << " not in range" << endl;
+	// 	}
+	// }
     imwrite( "lineDetected.jpg", image);
 
 
@@ -93,6 +121,7 @@ int main( int argc, char** argv ){
     normalize(hspaceLine, hspaceLine, 0, 255, NORM_MINMAX);
     imwrite( "hspaceLine.jpg", hspaceLine );
     imwrite( "suppressLine.jpg", supHLine );
+    imwrite( "threshold_mag.jpg", mag_threshold );
     return 0;
 }
 
@@ -123,10 +152,6 @@ Point getIntersect(tuple <double, double, double> l1, tuple <double, double, dou
 
 }
 
-// void getAllIntersect(vector< tuple <double, double, double> > lines){
-//
-//
-// }
 
 vector< tuple <double, double, double> > lineHighlight(Mat &hspace, Mat &output){
 	vector< tuple <double, double, double> > lines;
@@ -135,10 +160,10 @@ vector< tuple <double, double, double> > lineHighlight(Mat &hspace, Mat &output)
 	for (int p = 0; p < hspace.rows; p++) {
 		for (int theta = 0; theta < hspace.cols; theta++) {
 			if (hspace.at<double>(p,theta) > 0){
-				std::cout << p <<'\t'<<theta<< '\n';
+				std::cout << p <<'\t'<<theta/4<< '\n';
                 double rho = p - maxDistance;
-                double a = cos(theta*M_PI/180);
-                double b = sin(theta*M_PI/180);
+                double a = cos(theta/4*M_PI/180);
+                double b = sin(theta/4*M_PI/180);
                 double x0 = rho * a;
                 double y0 = rho * b;
                 Point p1,p2;
@@ -170,7 +195,7 @@ void suppressLine(Mat &hspace, double bound,int suppRange, Mat &out) {
 	double loopMax = max;
 	// // out.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]) = loopMax;
 	while (loopMax > bound * max) {
-		out.at<double>(maxIdx[0],maxIdx[1]) = loopMax;
+		out.at<double>(maxIdx[0],maxIdx[1]) = 255;
 		for (int j = maxIdx[0] - suppRange; j < tempHspace.rows && j < maxIdx[0] + suppRange; j++) {
 			for (int i = maxIdx[1] - suppRange; i < tempHspace.cols && i < maxIdx[1] + suppRange; i++) {
 				if (j < 0) j = 0;
@@ -189,8 +214,8 @@ void houghLine(Mat &mag, Mat &ang, Mat &hspace, int threshold){
 	for (int y = 0; y < mag.rows; y++) {
 		for (int x = 0; x < mag.cols; x++) {
 			if (mag.at<double>(y, x) > threshold) {
-                for (int theta = 0; theta < 180; theta+=1){
-    				double p = x * cos(theta*M_PI/180) + y * sin(theta*M_PI/180);
+                for (int theta = 0; theta < 720; theta+=1){
+    				double p = x * cos(theta/4*M_PI/180) + y * sin(theta/4*M_PI/180);
                     if (p < hspace.rows && theta < hspace.cols){
                         hspace.at<double>(p+maxDistance, theta) += 1;
                     }
@@ -200,6 +225,7 @@ void houghLine(Mat &mag, Mat &ang, Mat &hspace, int threshold){
 		}
 	}
 }
+
 
 
 void grad(Mat &dx, Mat &dy, Mat &mag, Mat &ang) {
@@ -225,28 +251,8 @@ void conv(cv::Mat &input, Mat kernel, cv::Mat &output)
 {
 	// intialise the output using the input
 	output.create(input.size(), DataType<double>::type);
-
-	// create the Gaussian kernel in 1D
-	// cv::Mat kX = cv::getGaussianKernel(size, -1);
-	// cv::Mat kY = cv::getGaussianKernel(size, -1);
-	//
-	// // make it 2D multiply one by the transpose of the other
-	// cv::Mat kernel = kX * kY.t();
-
-	//CREATING A DIFFERENT IMAGE kernel WILL BE NEEDED
-	//TO PERFORM OPERATIONS OTHER THAN GUASSIAN BLUR!!!
-
-	// we need to create a padded version of the input
-	// or there will be border effects
 	int kernelRadiusX = ( kernel.size[0] - 1 ) / 2;
 	int kernelRadiusY = ( kernel.size[1] - 1 ) / 2;
-
-       // SET KERNEL VALUES
-	// for( int m = -kernelRadiusX; m <= kernelRadiusX; m++ ) {
-	//   for( int n = -kernelRadiusY; n <= kernelRadiusY; n++ )
-    //        kernel.at<double>(m+ kernelRadiusX, n+ kernelRadiusY) = (double) 1.0/(size*size);
-	//
-    //    }
 
 	cv::Mat paddedInput;
 	cv::copyMakeBorder( input, paddedInput,
