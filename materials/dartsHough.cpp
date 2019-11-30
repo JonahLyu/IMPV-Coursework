@@ -68,8 +68,9 @@ void houghToMat(Mat hough_array, Mat &output, int radius);
 String cascade_name = "dartcascade/cascade.xml";
 CascadeClassifier cascade;
 
-int maxDistance;
-int precision = 4;
+//USED IN LINE FUNCTIONS
+int maxDistance; //max diagonal distance of each frame
+int precision = 4; //Number we divide 1 degree by
 
 /** @function main */
 int main( int argc, const char** argv )
@@ -79,6 +80,7 @@ int main( int argc, const char** argv )
 	Mat image = frame.clone();
 	Mat out = image.clone();
 	String s = argv[1];
+	String d = "det_" + s;
 	s = "out_" + s;
 
 	vector<Rect> gt;
@@ -97,7 +99,7 @@ int main( int argc, const char** argv )
 	// Draw ground truth rectangles on image
 	groundTruthDraw(frame, gt);
 	// 4. Save Result Image
-	imwrite( "dart_detected.jpg", frame );
+	imwrite( d, frame );
 
 	Mat mag;
 	Mat ang;
@@ -107,15 +109,15 @@ int main( int argc, const char** argv )
 	vector<Mat> framesMag = getFrames(mag, darts);
 	vector<Mat> framesAng = getFrames(ang, darts);
 
-    vector<lineS> lines;
-	vector<Point> iPoints;
-	vector<circ> circs;
-	vector<Rect> accepted;
-	vector<Rect> potential;
-	pair<circ,circ> board;
-	bool dupeFlag;
-	bool pointCheck;
-	Point center;
+    vector<lineS> lines; //Lines found by hough transform
+	vector<Point> iPoints; //Intersection points of found lines
+	vector<circ> circs; //Circles found by hough transform
+	vector<Rect> accepted; //Frames we accept as valid detection
+	vector<Rect> potential; //Frames that are potentially accepted, provided a better frame isn't found
+	pair<circ,circ> board; //Concentric circles representing a dartboard
+	bool dupeFlag; //If the frame we are looking at has already been accepted
+	bool pointCheck; //If we have enough points with enough earby neighbours
+	Point center; //The point to center our rectangle around
 
 	for (int i = 0; i < darts.size(); i++) {
 		dupeFlag = false; //Reduces time wasted processing detected region repeatedly
@@ -126,34 +128,32 @@ int main( int argc, const char** argv )
 			}
 		}
 		if (dupeFlag) continue; //Ignore frame if similar frame already accepted
-		lines = lineMain(image, framesAng[i], framesMag[i], darts[i]);
+		lines = lineMain(image, framesAng[i], framesMag[i], darts[i]); //Get lines found by hough transform
 		if (lines.size() < 5) continue; //Ignore frame if not enough lines present
 		
-		int count = 0;
-		iPoints = getAllIntersects(lines);
+		iPoints = getAllIntersects(lines); //Gets all points of intersection of provided lines
 
+		//Check if number of intersection points close to each other is sufficient
 		pointCheck = checkClosePoints(darts[i], iPoints, darts[i].width * 0.1, 10, 5, center);
-		if (!pointCheck) continue;
-		circs = circleMain(image, framesAng[i], framesMag[i], darts[i]);
+		if (!pointCheck) continue; //If not ignore frame
+		circs = circleMain(image, framesAng[i], framesMag[i], darts[i]); //Get circles in frame
 		if (circs.size() < 2) continue; //Ignore frame if not enough circles present
-		board = getCircPair(circs); //We assume only one dartboard per frame detected by viola jones
-		if (board.first.r == -1) {
+		board = getCircPair(circs); //We assume only one dartboard per frame detected by viola-jones
 
-			if (pointCheck) {
-
-				potential.push_back(darts[i]);
-
-			}
+		if (board.first.r == -1) { //If no valid circle pair discovered
+			potential.push_back(darts[i]); //If we have set of close intersection points, store current frame as potential location
 			continue;
 		}
-
-		lines = getValidLines(lines, board, count, iPoints);
-		if (count > 15) {
+		
+		int count = 0; //count of valid lines
+		lines = getValidLines(lines, board, count, iPoints); //Get lines that intersect near the centre of the circle pair
+		if (count > 15) { //If we have enough intersections, and valid circle pair
+			//Create rect encompassing largest of two concentric circles
 			Rect found(board.second.x-board.second.r, board.second.y-board.second.r, 2*board.second.r, 2*board.second.r);
 			found.x += darts[i].x;
 			found.y += darts[i].y;
 			cout << found << endl;
-			accepted.push_back(found);
+			accepted.push_back(found); //Store found as confident dartboard
 			circle(out, Point(board.first.x+darts[i].x, board.first.y+darts[i].y), board.first.r, Scalar(0, 255, 0), 2);
 			circle(out, Point(board.second.x+darts[i].x, board.second.y+darts[i].y), board.second.r, Scalar(0, 255, 0), 2);
 			//Draw lines
@@ -162,19 +162,18 @@ int main( int argc, const char** argv )
             }
 			continue;
 		}
+
 		//Guess that conecentric circles indicate potential dartboard
 		Rect found(board.second.x-board.second.r, board.second.y-board.second.r, 2*board.second.r, 2*board.second.r);
 		found.x += darts[i].x;
 		found.y += darts[i].y;
-
-		Mat newMag, newAng;
-		lines = lineMain(image, newAng, newMag, found);
-
+		//Check if number of intersection points close to each other is sufficient, and get point with most nearby neighbours
 		pointCheck = checkClosePoints(darts[i], iPoints, darts[i].width * 0.1, 10, 5, center);
 		if (pointCheck) {
+			//Center guess frame around point with most nearby neighbours
 			found.x = (center.x - board.second.r) + darts[i].x;
 			found.y = (center.y - board.second.r) + darts[i].y;
-			potential.push_back(found);
+			potential.push_back(found); //Store as non-confident dartboard
 		}
 	}
 
@@ -182,19 +181,19 @@ int main( int argc, const char** argv )
 	for (int i = 0; i < potential.size(); i++) {
 		potFlag = false;
 		for (int j = 0; j < accepted.size(); j++) {
-			if (rectIntersect(potential[i], accepted[j], 0)) {
+			if (rectIntersect(potential[i], accepted[j], 0)) { //Have we already stored a better guess for this area
 				potFlag = true;
 			}
 		}
-		if (potFlag) {
+		if (potFlag) { //If better guess found, remove non-confident guess
 			potential.erase(potential.begin() + i--);
-		} else {
+		} else { //If no better guess found, accept non-confident guess
 			cout << potential[i] << endl;
 			accepted.push_back(potential[i]);
 		}
 	}
 
-	for (int i = 0; i < accepted.size(); i++) {
+	for (int i = 0; i < accepted.size(); i++) { //Add accepted frames
 		rectangle(out, Point(accepted[i].x, accepted[i].y), Point(accepted[i].x + accepted[i].width, accepted[i].y + accepted[i].height), Scalar( 255, 0, 0 ), 2);
 	}
 	imwrite(s, out);
@@ -227,17 +226,16 @@ void houghSetup(Mat image, Mat &ang, Mat &mag) {
 vector< lineS > lineMain(Mat image, Mat &ang, Mat &mag, Rect pos) {
 	//hough line core code
 
-    maxDistance = sqrt(pow(mag.cols,2)+pow(mag.rows,2));
-    Mat hspaceLine(Size(180*precision, maxDistance*2), CV_64F, Scalar(0));
+    maxDistance = sqrt(pow(mag.cols,2)+pow(mag.rows,2));  //calculate the max diagonal distance of this frame
+    Mat hspaceLine(Size(180*precision, maxDistance*2), CV_64F, Scalar(0));  //generate line hough space container
     Mat mag_threshold;
-    thresholdingLine(mag, mag_threshold);
-    houghLine(mag_threshold, ang, hspaceLine, 0);
-	// std::cout << maxDistance << '\n';
+    thresholdingLine(mag, mag_threshold);  //magnitude thresholded
+    houghLine(mag_threshold, ang, hspaceLine, 0);  //generate line hough space
 
     Mat supHLine;
-    suppressLine(hspaceLine, 0.5, 10*precision, supHLine);
+    suppressLine(hspaceLine, 0.5, 10*precision, supHLine);  //do suppression for the line hough space with 0.5 bound
     vector< lineS > lines;
-    lines = getLines(supHLine);
+    lines = getLines(supHLine);  //get all lines of this frame
 	return lines;
 }
 
@@ -247,10 +245,8 @@ vector<circ> circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
 	double max;
 	minMaxIdx(output_mag_norm, NULL,&max,NULL,NULL);
 	Mat output_thresholded;
-	// thresholding(40, output_mag_norm, output_thresholded); //Alternate, can sorta detect dart3
 	thresholding(max*0.1, output_mag_norm, output_thresholded);
-	int radius = min(ang.rows, ang.cols); //The maximum radius circle that can be found may want to use max instead of min
-	// int radius = max(ang.rows, ang.cols); //The maximum radius circle that can be found
+	int radius = min(ang.rows, ang.cols); //The maximum radius circle that can be found
 	int dims[3] = {ang.rows, ang.cols, radius};
 	Mat hspace = Mat(3, dims, CV_64F, Scalar(0));
 	houghCircle(output_thresholded, ang, radius, hspace); //Have create 3d hough mat
@@ -408,6 +404,7 @@ vector<Rect> getTruths(int index) {
 	gt[14].push_back(Rect(114, 98, 139, 132));
 	gt[14].push_back(Rect(982, 95, 135, 125));
 	gt[15].push_back(Rect(155, 49, 132, 150));
+	if (index < 0 || index > 15) return gt[0];
 	return gt[index];
 }
 
@@ -453,9 +450,9 @@ vector<Rect> detectAndDisplay( Mat frame , vector<Rect> gt)
 		}
 		else cout << "Detected face " << i+1 << " " << darts[i]  << "doesn't match a ground truth face" << endl;
 	}
-	float precision = (float) truePos/ darts.size(); //ratio of faces found correctly, to faces detected in image
+	float prec = (float) truePos/ darts.size(); //ratio of faces found correctly, to faces detected in image
 	float recall = (dartCount > 0 ? (float) truePos/dartCount : 1); //True positive rate
-	float f1 = 2 * ((precision * recall) / (precision + recall)); //Measure of accuracy of classifier
+	float f1 = 2 * ((prec * recall) / (prec + recall)); //Measure of accuracy of classifier
 	f1 = (f1 != f1) ? 0 : f1; //f1 != f1 is true if f1 is NaN, as long as -ffast-math compiler flag not used
 	cout << truePos << " faces out of " << dartCount << " detected correctly." << endl;
 	cout << "True positive rate = " <<  recall << endl;
