@@ -47,7 +47,8 @@ vector<Mat> getFrames(Mat image, vector<Rect> det);
 bool circRatios(circ circs0, circ circs1);
 pair<circ,circ> getCircPair(vector<circ> circs);
 vector< lineS > getValidLines(vector< lineS> lines, pair<circ, circ> board, int &count, vector<Point> &iPoints);
-bool checkClosePoints(Rect frame, vector<Point> iPoints, int around, int minClose, int validWant);
+bool checkClosePoints(Rect frame, vector<Point> iPoints, int around, int minClose, int validWant, Point &mode);
+// bool checkClosePoints(Rect frame, vector<Point> iPoints, int around, int minClose, int validWant);
 bool ellipRatios(ellip ellips0, ellip ellips1);
 pair<ellip,ellip> getEllipPair(vector<ellip> ellips);
 vector< lineS > getValidLinesEllip(vector< lineS> lines, pair<ellip, ellip> board, int &count, vector<Point> &iPoints);
@@ -95,6 +96,8 @@ int main( int argc, const char** argv )
 	Mat frame = imread(argv[1], CV_LOAD_IMAGE_COLOR);
 	Mat image = frame.clone();
 	Mat out = image.clone();
+	String s = argv[1];
+	s = "out_" + s;
 
 	vector<Rect> gt;
 
@@ -108,6 +111,12 @@ int main( int argc, const char** argv )
 
 	// 3. Detect Faces and Display Result
 	vector<Rect> darts = detectAndDisplay( frame, gt ); //Order darts into region sizes?
+
+	// int size = darts.size();
+	// for( int i = 0; i < size; i++) {
+	// 	darts.push_back(Rect(darts[i]));
+	// }
+	// groupRectangles(darts, 1, 1.2);
 	
 	// vector<Mat> frames = getFrames(image, darts);
 	// Draw ground truth rectangles on image
@@ -133,6 +142,8 @@ int main( int argc, const char** argv )
 	vector<Rect> potential;
 	pair<circ,circ> board;
 	bool dupeFlag;
+	bool pointCheck;
+	Point center;
 	// for (int i = 0; i < darts.size(); i++) lineChecks.push_back(darts[i]);
 	// int size = lineChecks.size();
 	// for( int i = 0; i < size; i++ )
@@ -154,16 +165,19 @@ int main( int argc, const char** argv )
 		lines = lineMain(image, framesAng[i], framesMag[i], darts[i]);
 		if (lines.size() < 5) continue; //Ignore frame if not enough lines present
         // iPoints = getAllIntersects(lines);
+		int count = 0;
+		iPoints = getAllIntersects(lines);
+			// if (i > size) continue;
+		pointCheck = checkClosePoints(darts[i], iPoints, darts[i].width * 0.1, 10, 5, center);
+		if (!pointCheck) continue;
 		circs = circleMain(image, framesAng[i], framesMag[i], darts[i]);
 		if (circs.size() < 2) continue; //Ignore frame if not enough circles present
-		int count = 0;
 		board = getCircPair(circs); //We assume only one dartboard per frame detected by viola jones
-
 		if (board.first.r == -1) {
-			iPoints = getAllIntersects(lines);
 			// if (i > size) continue;
-			if (checkClosePoints(darts[i], iPoints, darts[i].width * 0.1, 10, 5)) {
+			if (pointCheck) {
 				// cout << found << endl;
+				// ellipseChecks(ellipseMain(image, framesAng[i], framesMag[i], darts[i]), lines, darts[i], accepted, out);
 				potential.push_back(darts[i]);
 			}
 			continue;
@@ -190,9 +204,28 @@ int main( int argc, const char** argv )
 		Rect found(board.second.x-board.second.r, board.second.y-board.second.r, 2*board.second.r, 2*board.second.r);
 		found.x += darts[i].x;
 		found.y += darts[i].y;
+		// found.x -= found.x * 0.1;
+		// found.y -= found.y * 0.1;
+		// found.width *= 1.2;
+		// found.height *= 1.2;
+		Mat newMag, newAng;
+		lines = lineMain(image, newAng, newMag, found);
+		// ellipseChecks(ellipseMain(image, framesAng[i], framesMag[i], found), lines, found, accepted, out);
 		// cout << found << endl;
-		potential.push_back(found);
+		pointCheck = checkClosePoints(darts[i], iPoints, darts[i].width * 0.1, 10, 5, center);
+		if (pointCheck) {
+			found.x = (center.x - board.second.r) + darts[i].x;
+			found.y = (center.y - board.second.r) + darts[i].y;
+			potential.push_back(found);
+		}
 	}
+
+	// int size = potential.size();
+	// for( int i = 0; i < size; i++) {
+	// 	potential.push_back(Rect(potential[i]));
+	// }
+	// groupRectangles(potential, 1, 0.8);
+
 	bool potFlag; //Would check if a area with correct circle ratios but not enough line intersections had been accepted, if not would accept area as dartboard
 	for (int i = 0; i < potential.size(); i++) {
 		potFlag = false;
@@ -203,6 +236,7 @@ int main( int argc, const char** argv )
 		}
 		if (potFlag) {
 			potential.erase(potential.begin() + i--);
+			// accepted.push_back(potential[i]);
 		} else {
 			cout << potential[i] << endl;
 			accepted.push_back(potential[i]);
@@ -212,7 +246,7 @@ int main( int argc, const char** argv )
 	for (int i = 0; i < accepted.size(); i++) {
 		rectangle(out, Point(accepted[i].x, accepted[i].y), Point(accepted[i].x + accepted[i].width, accepted[i].y + accepted[i].height), Scalar( 255, 0, 0 ), 2);
 	}
-	imwrite("accepted_frames.jpg", out);
+	imwrite(s, out);
     return 0;
 }
 
@@ -275,55 +309,55 @@ vector<circ> circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
 	return circs;
 }
 
-// vector<ellip> ellipseMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
-// 	Mat output_mag_norm;
-// 	normalize(mag, output_mag_norm, 0, 255, NORM_MINMAX);
-// 	double maxE;
-// 	minMaxIdx(output_mag_norm, NULL,&maxE,NULL,NULL);
-// 	Mat output_thresholded;
-// 	// thresholding(40, output_mag_norm, output_thresholded); //Alternate, can sorta detect dart3
-// 	thresholding(maxE*0.1, output_mag_norm, output_thresholded);
-// 	int radiusX = pos.width/2; //The max xradius
-// 	int radiusY = pos.height/2;
-// 	// int radius = max(ang.rows, ang.cols); //The maximum radius circle that can be found
-// 	int dims[4] = {ang.rows, ang.cols, radiusX, radiusY}; //only need 180 degrees of rotation as 360 would result in duplicate votes
-// 	cout << 1 << " " << radiusX << " " << radiusY << endl;
-// 	Mat hspace = Mat(4, dims, CV_64F);
-// 	// houghEllipse(output_thresholded, ang, radiusX, radiusY, hspace); //Have create 4d hough mat
-// 	hspace = hough_ellipse(mag, 20, 250, 0, max(radiusX, radiusY));
+vector<ellip> ellipseMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
+	Mat output_mag_norm;
+	normalize(mag, output_mag_norm, 0, 255, NORM_MINMAX);
+	double maxE;
+	minMaxIdx(output_mag_norm, NULL,&maxE,NULL,NULL);
+	Mat output_thresholded;
+	// thresholding(40, output_mag_norm, output_thresholded); //Alternate, can sorta detect dart3
+	thresholding(maxE*0.1, output_mag_norm, output_thresholded);
+	int radiusX = pos.width*0.5; //The max xradius
+	int radiusY = pos.height*0.5;
+	// int radius = max(ang.rows, ang.cols); //The maximum radius circle that can be found
+	int dims[4] = {ang.rows, ang.cols, radiusX, radiusY}; //only need 180 degrees of rotation as 360 would result in duplicate votes
+	cout << 1 << " " << radiusX << " " << radiusY << endl;
+	Mat hspace = Mat(4, dims, CV_64F);
+	houghEllipse(output_thresholded, ang, radiusX, radiusY, hspace); //Have create 4d hough mat
+	// hspace = hough_ellipse(mag, 20, 250, 0, max(radiusX, radiusY));
 
-// 	//Draw hough space
-// 	int dims2[2] = {ang.rows, ang.cols};
-// 	Mat output_hough_norm = Mat(2, dims2, CV_64F);
-// 	houghToMatEllipse(hspace, output_hough_norm, radiusX, radiusY);
+	//Draw hough space
+	int dims2[2] = {ang.rows, ang.cols};
+	Mat output_hough_norm = Mat(2, dims2, CV_64F);
+	houghToMatEllipse(hspace, output_hough_norm, radiusX, radiusY);
 
-// 	// double m;
-// 	// minMaxIdx(output_hough_norm, NULL,&m,NULL,NULL);
-// 	// cout << m << endl;
+	// double m;
+	// minMaxIdx(output_hough_norm, NULL,&m,NULL,NULL);
+	// cout << m << endl;
 
-// 	normalize(output_hough_norm, output_hough_norm, 0, 255, NORM_MINMAX);
-// 	imwrite( "output_hough.jpg", output_hough_norm);
+	normalize(output_hough_norm, output_hough_norm, 0, 255, NORM_MINMAX);
+	imwrite( "output_hough.jpg", output_hough_norm);
 
-// 	Mat supH;
-// 	vector< ellip > ellips;
-// 	cout << 2 << endl;
-// 	ellips = suppressEllipses(hspace, 0.8, ang.cols, ang.rows, radiusX, radiusY, 15, supH); //Suppress 4d hough mat
-// 	cout << 3 << endl;
+	Mat supH;
+	vector< ellip > ellips;
+	cout << 2 << endl;
+	ellips = suppressEllipses(hspace, 0.5, ang.cols, ang.rows, radiusX, radiusY, 10, supH); //Suppress 4d hough mat
+	cout << 3 << endl;
 
-// 	//Draw sup space
-// 	houghToMatEllipse(supH, output_hough_norm, radiusX, radiusY);
+	//Draw sup space
+	houghToMatEllipse(supH, output_hough_norm, radiusX, radiusY);
 
-// 	// double m;
-// 	// minMaxIdx(output_hough_norm, NULL,&m,NULL,NULL);
-// 	// cout << m << endl;
+	// double m;
+	// minMaxIdx(output_hough_norm, NULL,&m,NULL,NULL);
+	// cout << m << endl;
 
-// 	normalize(output_hough_norm, output_hough_norm, 0, 255, NORM_MINMAX);
-// 	imwrite( "output_sup.jpg", output_hough_norm);
+	normalize(output_hough_norm, output_hough_norm, 0, 255, NORM_MINMAX);
+	imwrite( "output_sup.jpg", output_hough_norm);
 
-// 	imwrite( "output_mag.jpg", output_mag_norm);
+	imwrite( "output_mag.jpg", output_mag_norm);
 
-// 	return ellips;
-// }
+	return ellips;
+}
 
 //
 //
@@ -360,7 +394,7 @@ pair<circ,circ> getCircPair(vector<circ> circs) {
 			// if (circRatios(circs[i], circs[j])) out = make_pair(circs[i], circs[j]);
 			if (circRatios(circs[i], circs[j])) {
 				if (out.first.r == -1) out = make_pair(circs[i], circs[j]); //Prioritses smallest circle pair discovered
-				else if (circs[i].r < out.first.r || circs[j].r < out.second.r) { //If smaller circle pair discovered, use them
+				else if (circs[i].r > out.first.r || circs[j].r > out.second.r) { //If smaller circle pair discovered, use them
 					out = make_pair(circs[i], circs[j]);
 				}
 				// else if (min(circs[i].r, circs[j].r)-max(circs[i].r, circs[j].r) < (min(out.first.r, out.second.r)-max(out.first.r, out.second.r))) {
@@ -398,11 +432,12 @@ vector< lineS > getValidLines(vector<lineS> lines, pair<circ, circ> board, int &
     return out;
 }
 
-bool checkClosePoints(Rect frame, vector<Point> iPoints, int around, int minClose, int validWant) {
+bool checkClosePoints(Rect frame, vector<Point> iPoints, int around, int minClose, int validWant, Point &mode) {
 	bool xFlag, yFlag;
 	// vector<int> votes(iPoints.size());
 	int countVotes = 0;
 	int validPoints = 0;
+	int maxPoints = validWant-1;
 	for (int i = 0; i < iPoints.size(); i++){
 		countVotes = 0;
 		for (int j = 0; j < iPoints.size(); j++){
@@ -415,117 +450,140 @@ bool checkClosePoints(Rect frame, vector<Point> iPoints, int around, int minClos
 			}
 		}
 		if (countVotes >= minClose) validPoints++;
+		if (validPoints > maxPoints) {
+			maxPoints = validPoints;
+			mode = iPoints[i];
+		}
 	}	
 	return validPoints >= validWant;
 }
 
-// bool ellipRatios(ellip ellips0, ellip ellips1) {
-// 	//circs0 assumed to be inner when checking
-// 	bool yFlag, xFlag, ratioFlagA, ratioFlagB;
-// 	yFlag = (ellips0.y > ellips1.y-5) && (ellips0.y < ellips1.y+5);
-// 	xFlag = (ellips0.x > ellips1.x-5) && (ellips0.x < ellips1.x+5);
-// 	ratioFlagA = (ellips1.a <= ellips0.a * 2.5) && (ellips1.a > ellips0.a * 1.1); //May want to increase 1.25 to 1.5
-// 	ratioFlagB = (ellips1.b <= ellips0.b * 2.5) && (ellips1.b > ellips0.b * 1.1);
-// 	if (yFlag && xFlag && ratioFlagA && ratioFlagB) {
-// 		return true;
-// 	}
-// 	return false;
-// }
-
-// pair<ellip,ellip> getEllipPair(vector<ellip> ellips) {
-// 	pair<ellip,ellip> out;
-// 	for (int i = 0; i < ellips.size(); i++) {
-// 		for (int j = 0; j < ellips.size(); j++) {
-// 			// if (circRatios(circs[i], circs[j])) out = make_pair(circs[i], circs[j]);
-// 			if (ellipRatios(ellips[i], ellips[j])) {
-// 				if (out.first.a == -1) out = make_pair(ellips[i], ellips[j]); //Prioritses smallest circle pair discovered
-// 				else if ((ellips[i].a > out.first.a || ellips[j].a > out.second.a) && (ellips[i].b > out.first.b || ellips[j].b > out.second.b)) { //If smaller circle pair discovered, use them
-// 					out = make_pair(ellips[i], ellips[j]);
-// 				}
+// bool checkClosePoints(Rect frame, vector<Point> iPoints, int around, int minClose, int validWant) {
+// 	bool xFlag, yFlag;
+// 	// vector<int> votes(iPoints.size());
+// 	int countVotes = 0;
+// 	int validPoints = 0;
+// 	for (int i = 0; i < iPoints.size(); i++){
+// 		countVotes = 0;
+// 		for (int j = 0; j < iPoints.size(); j++){
+// 			xFlag = false;
+// 			yFlag = false;
+// 			if (i != j){
+// 				if (iPoints[j].x < (iPoints[i].x + around) && iPoints[j].x > iPoints[i].x - around) xFlag = true;
+// 				if (iPoints[j].y < (iPoints[i].y + around) && iPoints[j].y > iPoints[i].y - around) yFlag = true;
+// 				if (xFlag && yFlag) countVotes++;
 // 			}
 // 		}
-// 	}
-// 	return out;
+// 		if (countVotes >= minClose) validPoints++;
+// 	}	
+// 	return validPoints >= validWant;
 // }
 
-// vector< lineS > getValidLinesEllip(vector< lineS> lines, pair<ellip, ellip> board, int &count, vector<Point> &iPoints) {
-// 	// vector<Point> iPoints; //Intersection points
-// 	bool added[lines.size()]; //Tracks if line is already tracked as accepted line
-// 	for (int i = 0; i < lines.size(); i++) added[i] = false; //Ensuring all elements start as false
-// 	count = 0;
-// 	vector<lineS> out;
-// 	for (int i = 0; i < lines.size(); i++) {
-// 		for (int j = i+1; j < lines.size(); j++) {
-// 			Point p1 = getIntersect(lines[i],lines[j]);
-// 			if (inCirc(board.first.x, board.first.y, max(board.first.a, board.first.b) * 0.5, p1)) {
-// 				count++;
-// 				iPoints.push_back(p1);
-// 				if (!added[i]) {	//If we aren't already tracking this line, track it
-// 					out.push_back(lines[i]);
-// 					added[i] = true;
-// 				}
-// 				if (!added[j]) {
-// 					out.push_back(lines[j]);
-// 					added[j] = true;
-// 				}
-// 			}
-// 		}
-// 	}
-//     return out;
-// }
+bool ellipRatios(ellip ellips0, ellip ellips1) {
+	//circs0 assumed to be inner when checking
+	bool yFlag, xFlag, ratioFlagA, ratioFlagB;
+	yFlag = (ellips0.y > ellips1.y-5) && (ellips0.y < ellips1.y+5);
+	xFlag = (ellips0.x > ellips1.x-5) && (ellips0.x < ellips1.x+5);
+	ratioFlagA = (ellips1.a <= ellips0.a * 2.5) && (ellips1.a > ellips0.a * 1); //May want to increase 1.25 to 1.5
+	ratioFlagB = (ellips1.b <= ellips0.b * 2.5) && (ellips1.b > ellips0.b * 1);
+	if (yFlag && xFlag && ratioFlagA && ratioFlagB) {
+		return true;
+	}
+	return false;
+}
 
-// void ellipseChecks(vector<ellip> ellips, vector<lineS> lines, Rect frame, vector<Rect> &accepted, Mat &out) {
-// 	// for (int i = 0; i < ellips.size(); i++) {
-// 	// 	Size ax = Size(ellips[i].a, ellips[i].b);
-// 	// 	ellipse(out, Point(ellips[i].x + frame.x, ellips[i].y + frame.y), ax, 0, 0, 360, Scalar( 255, 0, 0 ), 2);
-// 	// }
-// 	// for (int j = 0; j < lines.size(); j++) {
-// 	// 	rectangle(out, Point(frame.x, frame.y), Point(frame.x + frame.width, frame.y + frame.height), Scalar( 0, 0, 255 ), 2);
-//     //     drawLine(out, lines[j].rho, lines[j].a, lines[j].b, frame, Point ((frame.x + frame.width /2), (frame.y + frame.height/2)), frame.width);
-//     // }
-// 	cout << 1 << endl;
-// 	cout << lines.size() << " a" << endl;
-// 	vector<Point> iPoints;
-// 	//Issue could be here
-// 	pair<ellip, ellip> board = getEllipPair(ellips);
-// 	// cout << lines.size() << endl;
-// 	if (board.first.a == -1) {
-// 		// rectangle(out, Point(frame.x, frame.y), Point(frame.x + frame.width, frame.y + frame.height), Scalar( 255, 0, 0 ), 2);
-// 		return;
-// 	}
-// 	// Size ax = Size(board.first.a, board.first.b);
-// 	// ellipse(out, Point(board.first.x + frame.x, board.first.y + frame.y), ax, 0, 0, 360, Scalar( 0, 255, 0 ), 2);
-// 	// Size ax2 = Size(board.second.a, board.second.b);
-// 	// ellipse(out, Point(board.second.x + frame.x, board.second.y + frame.y), ax2, 0, 0, 360, Scalar( 0, 255, 0 ), 2);
-// 	// for (int j = 0; j < lines.size(); j++) {
-//     //         drawLine(out, lines[j].rho, lines[j].a, lines[j].b, frame, Point(board.first.x, board.first.y), frame.width);
-//     //     }
-// 	int count;
-// 	//Issue could be here
-// 	lines = getValidLinesEllip(lines, board, count, iPoints);
-// 	// cout << count << " c" << endl;
-// 	// rectangle(out, Point(frame.x, frame.y), Point(frame.x + frame.width, frame.y + frame.height), Scalar( 0, 0, 255 ), 2);
-// 	cout << count << " c" << endl;
-// 	if (count > 5) {
-// 		// rectangle(out, Point(frame.x, frame.y), Point(frame.x + frame.width, frame.y + frame.height), Scalar( 0, 0, 255 ), 2);
-// 		Rect found(board.second.x-board.second.a, board.second.y-board.second.b, 2*board.second.a, 2*board.second.b);
-// 		found.x += frame.x;
-// 		found.y += frame.y;
-// 		cout << found << endl;
-// 		accepted.push_back(found);
-// 		//How to draw ellipse?
-// 		// circle(out, Point(board.first.x+darts[i].x, board.first.y+darts[i].y), board.first.r, Scalar(0, 255, 0), 2);
-// 		// circle(out, Point(board.second.x+darts[i].x, board.second.y+darts[i].y), board.second.r, Scalar(0, 255, 0), 2);
-// 		//Draw lines
-//         for (int j = 0; j < lines.size(); j++) {
-// 			Size ax = Size(board.first.a, board.first.b);
-// 			ellipse(out, Point(board.first.x + frame.x, board.first.y + frame.y), ax, 0, 0, 360, Scalar( 0, 255, 0 ), 2);
-// 			Size ax2 = Size(board.second.a, board.second.b);
-// 			ellipse(out, Point(board.second.x + frame.x, board.second.y + frame.y), ax2, 0, 0, 360, Scalar( 0, 255, 0 ), 2);
-//             drawLine(out, lines[j].rho, lines[j].a, lines[j].b, frame, Point(board.first.x, board.first.y), found.width);
-//         }
-// 	}
-// }
+pair<ellip,ellip> getEllipPair(vector<ellip> ellips) {
+	pair<ellip,ellip> out;
+	for (int i = 0; i < ellips.size(); i++) {
+		for (int j = 0; j < ellips.size(); j++) {
+			// if (circRatios(circs[i], circs[j])) out = make_pair(circs[i], circs[j]);
+			if (ellipRatios(ellips[i], ellips[j])) {
+				if (out.first.a == -1) out = make_pair(ellips[i], ellips[j]);
+				else if ((ellips[i].a < out.first.a || ellips[j].a < out.second.a) || (ellips[i].b < out.first.b || ellips[j].b < out.second.b)) { //If smaller circle pair discovered, use them
+					out = make_pair(ellips[i], ellips[j]);
+				}
+				// else if ((ellips[i].a > out.first.a || ellips[j].a > out.second.a) && (ellips[i].b > out.first.b || ellips[j].b > out.second.b)) { //If smaller circle pair discovered, use them
+				// 	out = make_pair(ellips[i], ellips[j]);
+				// }
+			}
+		}
+	}
+	return out;
+}
+
+vector< lineS > getValidLinesEllip(vector< lineS> lines, pair<ellip, ellip> board, int &count, vector<Point> &iPoints) {
+	// vector<Point> iPoints; //Intersection points
+	bool added[lines.size()]; //Tracks if line is already tracked as accepted line
+	for (int i = 0; i < lines.size(); i++) added[i] = false; //Ensuring all elements start as false
+	count = 0;
+	vector<lineS> out;
+	for (int i = 0; i < lines.size(); i++) {
+		for (int j = i+1; j < lines.size(); j++) {
+			Point p1 = getIntersect(lines[i],lines[j]);
+			if (inCirc(board.first.x, board.first.y, max(board.first.a, board.first.b) * 0.5, p1)) {
+				count++;
+				iPoints.push_back(p1);
+				if (!added[i]) {	//If we aren't already tracking this line, track it
+					out.push_back(lines[i]);
+					added[i] = true;
+				}
+				if (!added[j]) {
+					out.push_back(lines[j]);
+					added[j] = true;
+				}
+			}
+		}
+	}
+    return out;
+}
+
+void ellipseChecks(vector<ellip> ellips, vector<lineS> lines, Rect frame, vector<Rect> &accepted, Mat &out) {
+	// for (int i = 0; i < ellips.size(); i++) {
+	// 	Size ax = Size(ellips[i].a, ellips[i].b);
+	// 	ellipse(out, Point(ellips[i].x + frame.x, ellips[i].y + frame.y), ax, 0, 0, 360, Scalar( 255, 0, 0 ), 2);
+	// }
+	// for (int j = 0; j < lines.size(); j++) {
+	// 	rectangle(out, Point(frame.x, frame.y), Point(frame.x + frame.width, frame.y + frame.height), Scalar( 0, 0, 255 ), 2);
+    //     drawLine(out, lines[j].rho, lines[j].a, lines[j].b, frame, Point ((frame.x + frame.width /2), (frame.y + frame.height/2)), frame.width);
+    // }
+	cout << 1 << endl;
+	cout << lines.size() << " a" << endl;
+	cout << ellips.size() << " e" << endl;
+	vector<Point> iPoints;
+	//Issue could be here
+	pair<ellip, ellip> board = getEllipPair(ellips);
+	// cout << lines.size() << endl;
+	if (board.first.a == -1) {
+		// rectangle(out, Point(frame.x, frame.y), Point(frame.x + frame.width, frame.y + frame.height), Scalar( 255, 0, 0 ), 1);
+		return;
+	}
+	// Size ax = Size
+	int count;
+	//Issue could be here
+	lines = getValidLinesEllip(lines, board, count, iPoints);
+	// cout << count << " c" << endl;
+	// rectangle(out, Point(frame.x, frame.y), Point(frame.x + frame.width, frame.y + frame.height), Scalar( 0, 0, 255 ), 2);
+	cout << count << " c" << endl;
+	if (count > 5) {
+		// rectangle(out, Point(frame.x, frame.y), Point(frame.x + frame.width, frame.y + frame.height), Scalar( 0, 0, 255 ), 2);
+		Rect found(board.second.x-board.second.a, board.second.y-board.second.b, 2*board.second.a, 2*board.second.b);
+		found.x += frame.x;
+		found.y += frame.y;
+		cout << found << endl;
+		accepted.push_back(found);
+		//How to draw ellipse?
+		// circle(out, Point(board.first.x+darts[i].x, board.first.y+darts[i].y), board.first.r, Scalar(0, 255, 0), 2);
+		// circle(out, Point(board.second.x+darts[i].x, board.second.y+darts[i].y), board.second.r, Scalar(0, 255, 0), 2);
+		//Draw lines
+        for (int j = 0; j < lines.size(); j++) {
+			Size ax = Size(board.first.a, board.first.b);
+			ellipse(out, Point(board.first.x + frame.x, board.first.y + frame.y), ax, 0, 0, 360, Scalar( 0, 255, 0 ), 2);
+			Size ax2 = Size(board.second.a, board.second.b);
+			ellipse(out, Point(board.second.x + frame.x, board.second.y + frame.y), ax2, 0, 0, 360, Scalar( 0, 255, 0 ), 2);
+            drawLine(out, lines[j].rho, lines[j].a, lines[j].b, frame, Point(board.first.x, board.first.y), found.width);
+        }
+	}
+}
 
 //
 //
@@ -995,7 +1053,7 @@ vector< ellip > suppressEllipses(Mat &hspace, double bound, int cols, int rows, 
 	int idx[4];
 	// out.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]) = loopMax;
 	while (loopMax > bound * max) {
-		cout << loopMax << " lm" << endl;
+		// cout << loopMax << " lm" << endl;
 		//y,x,r
 		e.x = maxIdx[1];
 		e.y = maxIdx[0];

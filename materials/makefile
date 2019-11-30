@@ -22,3 +22,22 @@ darts: ${dar}
 dartsH: ${darH}
 	${CC} ${darH} -o dartsHough
 	./dartsHough ${image}
+
+runAll:
+	./dartsHough dart0.jpg
+	./dartsHough dart1.jpg
+	./dartsHough dart2.jpg
+	./dartsHough dart3.jpg
+	./dartsHough dart4.jpg
+	./dartsHough dart5.jpg
+	./dartsHough dart6.jpg
+	./dartsHough dart7.jpg
+	./dartsHough dart8.jpg
+	./dartsHough dart9.jpg
+	./dartsHough dart10.jpg
+	./dartsHough dart11.jpg
+	./dartsHough dart12.jpg
+	./dartsHough dart13.jpg
+	./dartsHough dart14.jpg
+	./dartsHough dart15.jpg
+
