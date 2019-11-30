@@ -30,16 +30,29 @@ struct lineS {
 	double b;
 } ;
 
+// struct ellip {
+// 	int x = -1;
+// 	int y = -1;
+// 	int a = -1;
+// 	int b = -1;
+// } ;
+
 /** Function Headers */
 void houghSetup(Mat image, Mat &ang, Mat &mag);
 vector< lineS > lineMain(Mat image, Mat &ang, Mat &mag, Rect pos);
 vector<circ> circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos);
+// vector<ellip> ellipseMain(Mat &image, Mat &ang, Mat &mag, Rect pos);
 
 vector<Mat> getFrames(Mat image, vector<Rect> det);
 bool circRatios(circ circs0, circ circs1);
 pair<circ,circ> getCircPair(vector<circ> circs);
 vector< lineS > getValidLines(vector< lineS> lines, pair<circ, circ> board, int &count, vector<Point> &iPoints);
 bool checkClosePoints(Rect frame, vector<Point> iPoints, int around, int minClose, int validWant, Point &mode);
+// bool checkClosePoints(Rect frame, vector<Point> iPoints, int around, int minClose, int validWant);
+// bool ellipRatios(ellip ellips0, ellip ellips1);
+// pair<ellip,ellip> getEllipPair(vector<ellip> ellips);
+// vector< lineS > getValidLinesEllip(vector< lineS> lines, pair<ellip, ellip> board, int &count, vector<Point> &iPoints);
+// void ellipseChecks(vector<ellip> ellips, vector<lineS> lines, Rect frame, vector<Rect> &accepted, Mat &out);
 
 int pullNum(const char* name);
 bool rectIntersect(Rect r1, Rect r2, double thresh);
@@ -63,6 +76,10 @@ void thresholding(double threshold, Mat &input, Mat &output);
 vector< circ > suppressCircles(Mat &hspace, double bound, int cols, int rows, int rad, int suppRange, Mat &out);
 void houghCircle(Mat &mag_thr, Mat &grad_ori, int radius, Mat &hspace);
 void houghToMat(Mat hough_array, Mat &output, int radius);
+// //Ellipse Funcs
+// vector< ellip > suppressEllipses(Mat &hspace, double bound, int cols, int rows, int radX, int radY, int suppRange, Mat &out);
+// void houghEllipse(Mat &mag_thr, Mat &grad_ori, int radiusX, int radiusY, Mat &hspace);
+// void houghToMatEllipse(Mat hough_array, Mat &output, int radiusX, int radiusY);
 
 /** Global variables */
 String cascade_name = "dartcascade/cascade.xml";
@@ -260,6 +277,47 @@ vector<circ> circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
 	return circs;
 }
 
+// vector<ellip> ellipseMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
+// 	Mat output_mag_norm;
+// 	normalize(mag, output_mag_norm, 0, 255, NORM_MINMAX);
+// 	double maxE;
+// 	minMaxIdx(output_mag_norm, NULL,&maxE,NULL,NULL);
+// 	Mat output_thresholded;
+// 	// thresholding(40, output_mag_norm, output_thresholded); //Alternate, can sorta detect dart3
+// 	thresholding(maxE*0.1, output_mag_norm, output_thresholded);
+// 	int radiusX = pos.width*0.5; //The max xradius
+// 	int radiusY = pos.height*0.5;
+// 	// int radius = max(ang.rows, ang.cols); //The maximum radius circle that can be found
+// 	int dims[4] = {ang.rows, ang.cols, radiusX, radiusY}; //only need 180 degrees of rotation as 360 would result in duplicate votes
+// 	cout << 1 << " " << radiusX << " " << radiusY << endl;
+// 	Mat hspace = Mat(4, dims, CV_64F);
+// 	houghEllipse(output_thresholded, ang, radiusX, radiusY, hspace); //Have create 4d hough mat
+
+// 	//Draw hough space
+// 	int dims2[2] = {ang.rows, ang.cols};
+// 	Mat output_hough_norm = Mat(2, dims2, CV_64F);
+// 	houghToMatEllipse(hspace, output_hough_norm, radiusX, radiusY);
+
+// 	normalize(output_hough_norm, output_hough_norm, 0, 255, NORM_MINMAX);
+// 	imwrite( "output_hough.jpg", output_hough_norm);
+
+// 	Mat supH;
+// 	vector< ellip > ellips;
+// 	cout << 2 << endl;
+// 	ellips = suppressEllipses(hspace, 0.5, ang.cols, ang.rows, radiusX, radiusY, 10, supH); //Suppress 4d hough mat
+// 	cout << 3 << endl;
+
+// 	//Draw sup space
+// 	houghToMatEllipse(supH, output_hough_norm, radiusX, radiusY);
+
+// 	normalize(output_hough_norm, output_hough_norm, 0, 255, NORM_MINMAX);
+// 	imwrite( "output_sup.jpg", output_hough_norm);
+
+// 	imwrite( "output_mag.jpg", output_mag_norm);
+
+// 	return ellips;
+// }
+
 //
 //
 //
@@ -353,6 +411,86 @@ bool checkClosePoints(Rect frame, vector<Point> iPoints, int around, int minClos
 	}	
 	return validPoints >= validWant;
 }
+
+// bool ellipRatios(ellip ellips0, ellip ellips1) {
+// 	//circs0 assumed to be inner when checking
+// 	bool yFlag, xFlag, ratioFlagA, ratioFlagB;
+// 	yFlag = (ellips0.y > ellips1.y-5) && (ellips0.y < ellips1.y+5);
+// 	xFlag = (ellips0.x > ellips1.x-5) && (ellips0.x < ellips1.x+5);
+// 	ratioFlagA = (ellips1.a <= ellips0.a * 2.5) && (ellips1.a > ellips0.a * 1); //May want to increase 1.25 to 1.5
+// 	ratioFlagB = (ellips1.b <= ellips0.b * 2.5) && (ellips1.b > ellips0.b * 1);
+// 	if (yFlag && xFlag && ratioFlagA && ratioFlagB) {
+// 		return true;
+// 	}
+// 	return false;
+// }
+
+// pair<ellip,ellip> getEllipPair(vector<ellip> ellips) {
+// 	pair<ellip,ellip> out;
+// 	for (int i = 0; i < ellips.size(); i++) {
+// 		for (int j = 0; j < ellips.size(); j++) {
+// 			if (ellipRatios(ellips[i], ellips[j])) {
+// 				if (out.first.a == -1) out = make_pair(ellips[i], ellips[j]);
+// 				else if ((ellips[i].a < out.first.a || ellips[j].a < out.second.a) || (ellips[i].b < out.first.b || ellips[j].b < out.second.b)) { //If smaller circle pair discovered, use them
+// 					out = make_pair(ellips[i], ellips[j]);
+// 				}
+// 			}
+// 		}
+// 	}
+// 	return out;
+// }
+
+// vector< lineS > getValidLinesEllip(vector< lineS> lines, pair<ellip, ellip> board, int &count, vector<Point> &iPoints) {
+// 	bool added[lines.size()]; //Tracks if line is already tracked as accepted line
+// 	for (int i = 0; i < lines.size(); i++) added[i] = false; //Ensuring all elements start as false
+// 	count = 0;
+// 	vector<lineS> out;
+// 	for (int i = 0; i < lines.size(); i++) {
+// 		for (int j = i+1; j < lines.size(); j++) {
+// 			Point p1 = getIntersect(lines[i],lines[j]);
+// 			if (inCirc(board.first.x, board.first.y, max(board.first.a, board.first.b) * 0.5, p1)) {
+// 				count++;
+// 				iPoints.push_back(p1);
+// 				if (!added[i]) {	//If we aren't already tracking this line, track it
+// 					out.push_back(lines[i]);
+// 					added[i] = true;
+// 				}
+// 				if (!added[j]) {
+// 					out.push_back(lines[j]);
+// 					added[j] = true;
+// 				}
+// 			}
+// 		}
+// 	}
+//     return out;
+// }
+
+// void ellipseChecks(vector<ellip> ellips, vector<lineS> lines, Rect frame, vector<Rect> &accepted, Mat &out) {
+// 	vector<Point> iPoints;
+// 	pair<ellip, ellip> board = getEllipPair(ellips);
+// 	if (board.first.a == -1) {
+// 		return;
+// 	}
+
+// 	int count;
+// 	lines = getValidLinesEllip(lines, board, count, iPoints);
+
+// 	if (count > 5) {
+// 		Rect found(board.second.x-board.second.a, board.second.y-board.second.b, 2*board.second.a, 2*board.second.b);
+// 		found.x += frame.x;
+// 		found.y += frame.y;
+// 		cout << found << endl;
+// 		accepted.push_back(found);
+// 		//Draw lines
+//         for (int j = 0; j < lines.size(); j++) {
+// 			Size ax = Size(board.first.a, board.first.b);
+// 			ellipse(out, Point(board.first.x + frame.x, board.first.y + frame.y), ax, 0, 0, 360, Scalar( 0, 255, 0 ), 2);
+// 			Size ax2 = Size(board.second.a, board.second.b);
+// 			ellipse(out, Point(board.second.x + frame.x, board.second.y + frame.y), ax2, 0, 0, 360, Scalar( 0, 255, 0 ), 2);
+//             drawLine(out, lines[j].rho, lines[j].a, lines[j].b, frame, Point(board.first.x, board.first.y), found.width);
+//         }
+// 	}
+// }
 
 //
 //
@@ -752,3 +890,109 @@ void houghToMat(Mat hough_array, Mat &output, int radius){
 	}
 
 }
+
+// /////////////////////
+// //ELLIPSE FUNCTIONS//
+// /////////////////////
+
+// vector< ellip > suppressEllipses(Mat &hspace, double bound, int cols, int rows, int radX, int radY, int suppRange, Mat &out) {
+// 	vector< ellip > ellips;
+// 	int dims[4] = {rows, cols, radX, radY};
+// 	out = Mat(4, dims, CV_64F, Scalar(0));
+// 	if (bound > 1) {
+// 		return ellips;
+// 	}
+// 	int maxIdx[4];
+// 	minMaxIdx(hspace, NULL, NULL, NULL, maxIdx);
+// 	double max = hspace.at<double>(maxIdx);
+// 	double loopMax = max;
+// 	ellip e;
+// 	int idx[4];
+// 	while (loopMax > bound * max) {
+// 		// cout << loopMax << " lm" << endl;
+// 		//y,x,r
+// 		e.x = maxIdx[1];
+// 		e.y = maxIdx[0];
+// 		e.a = maxIdx[2];
+// 		e.b = maxIdx[3];
+// 		ellips.push_back(e);
+// 		out.at<double>(maxIdx[0],maxIdx[1],maxIdx[2]) = loopMax;
+// 		for (int j = maxIdx[0] - suppRange; j < rows && j < maxIdx[0] + suppRange; j++) {
+// 			for (int i = maxIdx[1] - suppRange; i < cols && i < maxIdx[1] + suppRange; i++) {
+// 				for (int a = maxIdx[2] - suppRange; a < radX && a < maxIdx[2] + suppRange; a++) {
+// 					for (int b = maxIdx[3] - suppRange; b < radY && b < maxIdx[3] + suppRange; b++) {
+// 						if (j < 0) j = 0;
+// 						if (i < 0) i = 0;
+// 						if (a < 0) a = 0;
+// 						if (b < 0) b = 0;
+// 						idx[0] = j;
+// 						idx[1] = i;
+// 						idx[2] = a;
+// 						idx[3] = b;
+// 						hspace.at<double>(idx) = 0;
+// 					}
+// 				}
+// 			}
+// 		}
+// 		minMaxIdx(hspace, NULL, NULL, NULL, maxIdx);
+// 		loopMax = hspace.at<double>(maxIdx);
+// 	}
+// 	return ellips;
+// }
+
+// void houghEllipse(Mat &mag_thr, Mat &grad_ori, int radiusX, int radiusY, Mat &hspace) {
+// 	int idx[4];
+// 	int x0[2], y0[2];
+// 	double valMag, valAng;
+// 	for (int y = 0; y < mag_thr.rows; y++) {
+// 		for (int x = 0; x < mag_thr.cols; x++) {
+// 			for (int a = 0; a < radiusX; a++) {
+// 				for (int b = 0; b < radiusY; b++) {
+// 					if (mag_thr.at<double>(y, x) > 0) {
+// 						// cout << x << " " << y << " " << a << " " << b << endl;
+// 						// cout << mag_thr.cols << " " << mag_thr.rows << " " << radiusX << " " << radiusY << endl;
+// 						// cout << endl;
+// 						valAng = grad_ori.at<double>(y,x);
+// 						x0[0] = x + (a * cos(valAng));
+// 						x0[1] = x - (a * cos(valAng));
+// 						y0[0] = y + (b * sin(valAng));
+// 						y0[1] = y - (b * sin(valAng));
+// 						for (int m = 0; m < 2; m++) {
+// 							for (int n = 0; n < 2; n++) {
+// 								bool f1 = (y0[n] > 0 && y0[n] < mag_thr.rows);
+// 								bool f2 = (x0[m] > 0 && x0[m] < mag_thr.cols);
+// 								if (f1 && f2) {
+// 									idx[0] = y0[n];
+// 									idx[1] = x0[m];
+// 									idx[2] = a;
+// 									idx[3] = b;
+// 									hspace.at<double>(idx) += 1;
+// 								}
+// 							}
+// 						}
+// 					}
+// 				}
+// 			}
+// 		}
+// 	}
+// }
+
+// void houghToMatEllipse(Mat hough_array, Mat &output, int radiusX, int radiusY) {
+// 	int idx[4];
+// 	int rSum;
+// 	for (int y = 0; y < output.rows; y++) {
+// 		for (int x = 0; x < output.cols; x++) {
+// 			rSum = 0;
+// 			for (int a = 0; a < radiusX; a++) {
+// 				for (int b = 0; b < radiusY; b++) {
+// 					idx[0] = y;
+// 					idx[1] = x;
+// 					idx[2] = a;
+// 					idx[3] = b;
+// 					rSum += hough_array.at<double>(idx);
+// 				}
+// 			}
+// 			output.at<double>(y,x) = rSum;
+// 		}
+// 	}
+// }
