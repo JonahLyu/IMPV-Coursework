@@ -83,7 +83,7 @@ int main( int argc, const char** argv )
 	// Mat out = image.clone();
 	String s = argv[1];
 	String d = "det_" + s;
-	s = "out_" + s;
+	s = "detected.jpg";
 
 	vector<Rect> gt;
 
@@ -145,7 +145,7 @@ vector< lineS > lineMain(Mat image, Mat &ang, Mat &mag, Rect pos) {
 
 	// Mat hough_norm;
 	// normalize(hspaceLine, hough_norm, 0, 255, NORM_MINMAX);
-
+	// imwrite("line_thresh.jpg", mag_threshold);
 	// imwrite("hough_line.jpg", hough_norm);
 
 	return lines;
@@ -444,7 +444,7 @@ void detectStats(vector<Rect> gt, vector<Rect> detected) {
 	{
 		bool matchFlag = false;
 		for (int j = 0; j < gt.size(); j++) {
-			if (rectIntersect(detected[i], gt[j], 0.5)) {
+			if (rectIntersect(detected[i], gt[j], 0.4)) {
 				gt.erase(gt.begin() + j);
 				matchFlag = true;
 				break;

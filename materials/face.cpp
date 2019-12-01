@@ -135,7 +135,7 @@ void detectAndDisplay( Mat frame , vector<Rect> gt)
 		bool matchFlag = false;
 		rectangle(frame, Point(faces[i].x, faces[i].y), Point(faces[i].x + faces[i].width, faces[i].y + faces[i].height), Scalar( 0, 255, 0 ), 2);
 		for (int j = 0; j < gt.size(); j++) {
-			if (rectIntersect(faces[i], gt[j], 0.75)) {
+			if (rectIntersect(faces[i], gt[j], 0.4)) {
 				gt.erase(gt.begin() + j);
 				matchFlag = true;
 				break;

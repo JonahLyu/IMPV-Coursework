@@ -39,7 +39,6 @@ vector<Mat> getFrames(Mat image, vector<Rect> det);
 bool circRatios(circ circs0, circ circs1);
 pair<circ,circ> getCircPair(vector<circ> circs);
 vector< lineS > getValidLines(vector< lineS> lines, pair<circ, circ> board, int &count, vector<Point> &iPoints);
-bool checkClosePoints(Rect frame, vector<Point> iPoints, int around, int minClose, int validWant, Point &mode);
 
 int pullNum(const char* name);
 bool rectIntersect(Rect r1, Rect r2, double thresh);
@@ -172,7 +171,7 @@ int main( int argc, const char** argv )
 	{
 		bool matchFlag = false;
 		for (int j = 0; j < gt.size(); j++) {
-			if (rectIntersect(accepted[i], gt[j], 0.5)) {
+			if (rectIntersect(accepted[i], gt[j], 0.4)) {
 				gt.erase(gt.begin() + j);
 				matchFlag = true;
 				break;
@@ -319,31 +318,6 @@ vector< lineS > getValidLines(vector<lineS> lines, pair<circ, circ> board, int &
     return out;
 }
 
-bool checkClosePoints(Rect frame, vector<Point> iPoints, int around, int minClose, int validWant, Point &mode) {
-	bool xFlag, yFlag;
-	int countVotes = 0;
-	int validPoints = 0;
-	int maxPoints = validWant-1;
-	for (int i = 0; i < iPoints.size(); i++){
-		countVotes = 0;
-		for (int j = 0; j < iPoints.size(); j++){
-			xFlag = false;
-			yFlag = false;
-			if (i != j){
-				if (iPoints[j].x < (iPoints[i].x + around) && iPoints[j].x > iPoints[i].x - around) xFlag = true;
-				if (iPoints[j].y < (iPoints[i].y + around) && iPoints[j].y > iPoints[i].y - around) yFlag = true;
-				if (xFlag && yFlag) countVotes++;
-			}
-		}
-		if (countVotes >= minClose) validPoints++;
-		if (validPoints > maxPoints) {
-			maxPoints = validPoints;
-			mode = iPoints[i];
-		}
-	}	
-	return validPoints >= validWant;
-}
-
 //
 //
 //
@@ -431,7 +405,7 @@ vector<Rect> detectAndDisplay( Mat frame , vector<Rect> gt)
 		bool matchFlag = false;
 		rectangle(frame, Point(darts[i].x, darts[i].y), Point(darts[i].x + darts[i].width, darts[i].y + darts[i].height), Scalar( 0, 255, 0 ), 2);
 		for (int j = 0; j < gt.size(); j++) {
-			if (rectIntersect(darts[i], gt[j], 0.5)) {
+			if (rectIntersect(darts[i], gt[j], 0.4)) {
 				gt.erase(gt.begin() + j);
 				matchFlag = true;
 				break;
