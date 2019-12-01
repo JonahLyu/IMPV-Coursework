@@ -72,7 +72,7 @@ int main( int argc, char** argv ){
     // image = image(Rect(578, 127, 67, 89)); //10
     // image = image(Rect(91, 103, 103, 115)); //10
     // image = image(Rect(161, 85, 95, 101)); //11
-    image = image(Rect(269, 119, 139, 136)); //13
+    // image = image(Rect(269, 119, 139, 136)); //13
 
 
 
