@@ -34,7 +34,6 @@ struct lineS {
 void houghSetup(Mat image, Mat &ang, Mat &mag);
 vector< lineS > lineMain(Mat image, Mat &ang, Mat &mag, Rect pos);
 vector<circ> circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos);
-void acceptReject(Mat image, vector<Rect> darts, vector<Rect> gt, String s);
 
 vector<Mat> getFrames(Mat image, vector<Rect> det);
 bool circRatios(circ circs0, circ circs1);
@@ -45,7 +44,6 @@ bool checkClosePoints(Rect frame, vector<Point> iPoints, int around, int minClos
 int pullNum(const char* name);
 bool rectIntersect(Rect r1, Rect r2, double thresh);
 vector<Rect> getTruths( int index );
-void detectStats(vector<Rect> gt, vector<Rect> detected);
 vector<Rect> detectAndDisplay( Mat frame, vector<Rect> gt );
 void groundTruthDraw(Mat frame, vector<Rect> gt);
 vector<Rect> getGT(const char* name);
@@ -80,7 +78,7 @@ int main( int argc, const char** argv )
        // 1. Read Input Image
 	Mat frame = imread(argv[1], CV_LOAD_IMAGE_COLOR);
 	Mat image = frame.clone();
-	// Mat out = image.clone();
+	Mat out = image.clone();
 	String s = argv[1];
 	String d = "det_" + s;
 	s = "out_" + s;
@@ -94,6 +92,7 @@ int main( int argc, const char** argv )
 
 	// 2. Load the Strong Classifier in a structure called `Cascade'
 	if( !cascade.load( cascade_name ) ){ printf("--(!)Error loading\n"); return -1; };
+
 	// 3. Detect Faces and Display Result
 	vector<Rect> darts = detectAndDisplay( frame, gt );
 
@@ -102,83 +101,6 @@ int main( int argc, const char** argv )
 	// 4. Save Result Image
 	imwrite( d, frame );
 
-	acceptReject(image, darts, gt, s);
-    return 0;
-}
-
-void houghSetup(Mat image, Mat &ang, Mat &mag) {
-	// CONVERT COLOUR AND SAVE
-    Mat gray_image;
-    cvtColor( image, gray_image, CV_BGR2GRAY );
-    int kSize = 3;
-    double myKdx[3][3] = {{-1,0,1},
-    					{-2,0,2},
-    					{-1,0,1}};
-    double myKdy[3][3] = {{-1,-2,-1},
-    					{0,0,0},
-    					{1,2,1}};
-    Mat kerndx(3,3, CV_64F, myKdx);
-    Mat kerndy(3,3, CV_64F, myKdy);
-
-    Mat convImdx, dxNonNorm;
-    conv(gray_image,kerndx,dxNonNorm);
-
-    Mat convImdy, dyNonNorm;
-    conv(gray_image,kerndy,dyNonNorm);
-
-    grad(dxNonNorm, dyNonNorm, mag, ang);
-}
-
-vector< lineS > lineMain(Mat image, Mat &ang, Mat &mag, Rect pos) {
-	//hough line core code
-
-    maxDistance = sqrt(pow(mag.cols,2)+pow(mag.rows,2));  //calculate the max diagonal distance of this frame
-    Mat hspaceLine(Size(180*precision, maxDistance*2), CV_64F, Scalar(0));  //generate line hough space container
-    Mat mag_threshold;
-    thresholdingLine(mag, mag_threshold);  //magnitude thresholded
-    houghLine(mag_threshold, ang, hspaceLine, 0);  //generate line hough space
-
-    Mat supHLine;
-    suppressLine(hspaceLine, 0.5, 10*precision, supHLine);  //do suppression for the line hough space with 0.5 bound
-    vector< lineS > lines;
-    lines = getLines(supHLine);  //get all lines of this frame
-
-	// Mat hough_norm;
-	// normalize(hspaceLine, hough_norm, 0, 255, NORM_MINMAX);
-
-	// imwrite("hough_line.jpg", hough_norm);
-
-	return lines;
-}
-
-vector<circ> circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
-	Mat output_mag_norm;
-	normalize(mag, output_mag_norm, 0, 255, NORM_MINMAX);
-	double max;
-	minMaxIdx(output_mag_norm, NULL,&max,NULL,NULL);
-	Mat output_thresholded;
-	thresholding(max*0.1, output_mag_norm, output_thresholded);
-	int radius = min(ang.rows, ang.cols); //The maximum radius circle that can be found
-	int dims[3] = {ang.rows, ang.cols, radius};
-	Mat hspace = Mat(3, dims, CV_64F, Scalar(0));
-	houghCircle(output_thresholded, ang, radius, hspace); //Have create 3d hough mat
-
-	// Mat output_hough;
-	// output_hough.create(ang.size(), ang.type());
-	// houghToMat(hspace, output_hough, radius);
-	// normalize(output_hough, output_hough, 0, 255, NORM_MINMAX);
-	// imwrite("circle_thresh.jpg", output_thresholded);
-	// imwrite("hough_circle.jpg", output_hough);
-	
-	Mat supH;
-	vector< circ > circs;
-	circs = suppressCircles(hspace, 0.5, ang.cols, ang.rows, radius, 15, supH); //Suppress 3d hough mat
-
-	return circs;
-}
-
-void acceptReject(Mat image, vector<Rect> darts, vector<Rect> gt, String s) {
-	Mat out = image.clone();
 	Mat mag;
 	Mat ang;
 	houghSetup(image, ang, mag);
@@ -218,10 +140,7 @@ void acceptReject(Mat image, vector<Rect> darts, vector<Rect> gt, String s) {
 		if (circs.size() < 2) continue; //Ignore frame if not enough circles present
 		board = getCircPair(circs); //We assume only one dartboard per frame detected by viola-jones
 
-		if (board.first.r == -1) { //If no valid circle pair discovered
-			potential.push_back(darts[i]); //If we have set of close intersection points, store current frame as potential location
-			continue;
-		}
+		if (board.first.r == -1) continue; //If no valid circle apir discovered
 		
 		int count = 0; //count of valid lines
 		lines = getValidLines(lines, board, count, iPoints); //Get lines that intersect near the centre of the circle pair
@@ -240,44 +159,94 @@ void acceptReject(Mat image, vector<Rect> darts, vector<Rect> gt, String s) {
             }
 			continue;
 		}
-
-		//Guess that conecentric circles indicate potential dartboard
-		Rect found(board.second.x-board.second.r, board.second.y-board.second.r, 2*board.second.r, 2*board.second.r);
-		found.x += darts[i].x;
-		found.y += darts[i].y;
-		//Check if number of intersection points close to each other is sufficient, and get point with most nearby neighbours
-		pointCheck = checkClosePoints(darts[i], iPoints, darts[i].width * 0.1, 10, 5, center);
-		if (pointCheck) {
-			//Center guess frame around point with most nearby neighbours
-			found.x = (center.x - board.second.r) + darts[i].x;
-			found.y = (center.y - board.second.r) + darts[i].y;
-			potential.push_back(found); //Store as non-confident dartboard
-		}
 	}
 
-	bool potFlag; //Would check if a area with correct circle ratios but not enough line intersections had been accepted, if not would accept area as dartboard
-	for (int i = 0; i < potential.size(); i++) {
-		potFlag = false;
-		for (int j = 0; j < accepted.size(); j++) {
-			if (rectIntersect(potential[i], accepted[j], 0)) { //Have we already stored a better guess for this area
-				potFlag = true;
-			}
-		}
-		if (potFlag) { //If better guess found, remove non-confident guess
-			potential.erase(potential.begin() + i--);
-		} else { //If no better guess found, accept non-confident guess
-			cout << potential[i] << endl;
-			accepted.push_back(potential[i]);
-		}
-	}
-	// lineMain(image, ang, mag, Rect(0,0,image.cols,image.rows));
-	// circleMain(image, ang, mag, Rect(0,0,image.cols,image.rows));
 	for (int i = 0; i < accepted.size(); i++) { //Add accepted frames
 		rectangle(out, Point(accepted[i].x, accepted[i].y), Point(accepted[i].x + accepted[i].width, accepted[i].y + accepted[i].height), Scalar( 255, 0, 0 ), 2);
 	}
-	groundTruthDraw(out, gt);
 	imwrite(s, out);
-	detectStats(gt, accepted);
+	int truePos = 0;
+	int frameCount = gt.size();
+	for( int i = 0; i < accepted.size(); i++ ) //Exit loop early when all ground truths seen
+	{
+		bool matchFlag = false;
+		for (int j = 0; j < gt.size(); j++) {
+			if (rectIntersect(accepted[i], gt[j], 0.5)) {
+				gt.erase(gt.begin() + j);
+				matchFlag = true;
+				break;
+			}
+		}
+		if (matchFlag) {
+			// cout << "Detected face " << i+1 << " " << faces[i] << " closely matches ground truth" << endl;
+			truePos++;
+		}
+		else cout << "Detected face " << i+1 << " " << accepted[i]  << "doesn't match a ground truth face" << endl;
+	}
+	float prec = (float) truePos / accepted.size(); //ratio of faces found correctly, to faces detected in image
+	float recall = (frameCount > 0 ? (float) truePos/frameCount : 1); //True positive rate
+	float f1 = 2 * ((prec * recall) / (prec + recall)); //Measure of accuracy of classifier
+	f1 = (f1 != f1) ? 0 : f1; //f1 != f1 is true if f1 is NaN, as long as -ffast-math compiler flag not used
+	cout << truePos << " faces out of " << frameCount << " detected correctly." << endl;
+	cout << "True positive rate = " <<  recall << endl;
+	cout << "F1 score = " << f1 << endl;
+    return 0;
+}
+
+void houghSetup(Mat image, Mat &ang, Mat &mag) {
+	// CONVERT COLOUR AND SAVE
+    Mat gray_image;
+    cvtColor( image, gray_image, CV_BGR2GRAY );
+    int kSize = 3;
+    double myKdx[3][3] = {{-1,0,1},
+    					{-2,0,2},
+    					{-1,0,1}};
+    double myKdy[3][3] = {{-1,-2,-1},
+    					{0,0,0},
+    					{1,2,1}};
+    Mat kerndx(3,3, CV_64F, myKdx);
+    Mat kerndy(3,3, CV_64F, myKdy);
+
+    Mat convImdx, dxNonNorm;
+    conv(gray_image,kerndx,dxNonNorm);
+
+    Mat convImdy, dyNonNorm;
+    conv(gray_image,kerndy,dyNonNorm);
+
+    grad(dxNonNorm, dyNonNorm, mag, ang);
+}
+
+vector< lineS > lineMain(Mat image, Mat &ang, Mat &mag, Rect pos) {
+	//hough line core code
+
+    maxDistance = sqrt(pow(mag.cols,2)+pow(mag.rows,2));  //calculate the max diagonal distance of this frame
+    Mat hspaceLine(Size(180*precision, maxDistance*2), CV_64F, Scalar(0));  //generate line hough space container
+    Mat mag_threshold;
+    thresholdingLine(mag, mag_threshold);  //magnitude thresholded
+    houghLine(mag_threshold, ang, hspaceLine, 0);  //generate line hough space
+
+    Mat supHLine;
+    suppressLine(hspaceLine, 0.5, 10*precision, supHLine);  //do suppression for the line hough space with 0.5 bound
+    vector< lineS > lines;
+    lines = getLines(supHLine);  //get all lines of this frame
+	return lines;
+}
+
+vector<circ> circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
+	Mat output_mag_norm;
+	normalize(mag, output_mag_norm, 0, 255, NORM_MINMAX);
+	double max;
+	minMaxIdx(output_mag_norm, NULL,&max,NULL,NULL);
+	Mat output_thresholded;
+	thresholding(max*0.1, output_mag_norm, output_thresholded);
+	int radius = min(ang.rows, ang.cols); //The maximum radius circle that can be found
+	int dims[3] = {ang.rows, ang.cols, radius};
+	Mat hspace = Mat(3, dims, CV_64F, Scalar(0));
+	houghCircle(output_thresholded, ang, radius, hspace); //Have create 3d hough mat
+	Mat supH;
+	vector< circ > circs;
+	circs = suppressCircles(hspace, 0.5, ang.cols, ang.rows, radius, 15, supH); //Suppress 3d hough mat
+	return circs;
 }
 
 //
@@ -421,7 +390,8 @@ vector<Rect> getTruths(int index) {
 	gt[10].push_back(Rect(912, 146, 41, 75));
 	gt[10].push_back(Rect(578, 127, 67, 89));
 	gt[10].push_back(Rect(91, 103, 103, 115));
-	gt[11].push_back(Rect(171, 108, 72, 71));
+	gt[11].push_back(Rect(161, 98, 82, 81));
+	gt[11].push_back(Rect(436, 111, 53, 77)); //Maybe too hidden to expect detection
 	gt[12].push_back(Rect(154, 72, 66, 146));
 	gt[13].push_back(Rect(269, 119, 139, 136));
 	gt[14].push_back(Rect(114, 98, 139, 132));
@@ -437,41 +407,13 @@ void groundTruthDraw(Mat frame, vector<Rect> gt) {
 	}
 }
 
-void detectStats(vector<Rect> gt, vector<Rect> detected) {
-	int truePos = 0;
-	int frameCount = gt.size();
-	for( int i = 0; i < detected.size(); i++ ) //Exit loop early when all ground truths seen
-	{
-		bool matchFlag = false;
-		for (int j = 0; j < gt.size(); j++) {
-			if (rectIntersect(detected[i], gt[j], 0.5)) {
-				gt.erase(gt.begin() + j);
-				matchFlag = true;
-				break;
-			}
-		}
-		if (matchFlag) {
-			// cout << "Detected face " << i+1 << " " << faces[i] << " closely matches ground truth" << endl;
-			truePos++;
-		}
-		else cout << "Detected face " << i+1 << " " << detected[i]  << "doesn't match a ground truth face" << endl;
-	}
-	float prec = (float) truePos / detected.size(); //ratio of faces found correctly, to faces detected in image
-	float recall = (frameCount > 0 ? (float) truePos/frameCount : 1); //True positive rate
-	float f1 = 2 * ((prec * recall) / (prec + recall)); //Measure of accuracy of classifier
-	f1 = (f1 != f1) ? 0 : f1; //f1 != f1 is true if f1 is NaN, as long as -ffast-math compiler flag not used
-	cout << truePos << " faces out of " << frameCount << " detected correctly." << endl;
-	cout << "True positive rate = " <<  recall << endl;
-	cout << "F1 score = " << f1 << endl;
-}
-
 /** @function detectAndDisplay */
 vector<Rect> detectAndDisplay( Mat frame , vector<Rect> gt)
 {
 	std::vector<Rect> darts;
 	Mat frame_gray;
-	// int truePos = 0;
-	// int dartCount = gt.size();
+	int truePos = 0;
+	int dartCount = gt.size();
 
 	// 1. Prepare Image by turning it into Grayscale and normalising lighting
 	cvtColor( frame, frame_gray, CV_BGR2GRAY );
@@ -483,9 +425,31 @@ vector<Rect> detectAndDisplay( Mat frame , vector<Rect> gt)
        // 3. Print number of Faces found
 	std::cout << darts.size() << std::endl;
 
-    //    4. Draw box around faces found
-	for (int i = 0; i < darts.size(); i++) rectangle(frame, Point(darts[i].x, darts[i].y), Point(darts[i].x + darts[i].width, darts[i].y + darts[i].height), Scalar( 0, 255, 0 ), 2);
-	detectStats(gt, darts);
+       // 4. Draw box around faces found
+	for( int i = 0; i < darts.size(); i++ ) //Exit loop early when all ground truths seen
+	{
+		bool matchFlag = false;
+		rectangle(frame, Point(darts[i].x, darts[i].y), Point(darts[i].x + darts[i].width, darts[i].y + darts[i].height), Scalar( 0, 255, 0 ), 2);
+		for (int j = 0; j < gt.size(); j++) {
+			if (rectIntersect(darts[i], gt[j], 0.5)) {
+				gt.erase(gt.begin() + j);
+				matchFlag = true;
+				break;
+			}
+		}
+		if (matchFlag) {
+			// cout << "Detected face " << i+1 << " " << faces[i] << " closely matches ground truth" << endl;
+			truePos++;
+		}
+		else cout << "Detected face " << i+1 << " " << darts[i]  << "doesn't match a ground truth face" << endl;
+	}
+	float prec = (float) truePos/ darts.size(); //ratio of faces found correctly, to faces detected in image
+	float recall = (dartCount > 0 ? (float) truePos/dartCount : 1); //True positive rate
+	float f1 = 2 * ((prec * recall) / (prec + recall)); //Measure of accuracy of classifier
+	f1 = (f1 != f1) ? 0 : f1; //f1 != f1 is true if f1 is NaN, as long as -ffast-math compiler flag not used
+	cout << truePos << " faces out of " << dartCount << " detected correctly." << endl;
+	cout << "True positive rate = " <<  recall << endl;
+	cout << "F1 score = " << f1 << endl;
 	return darts;
 }
 

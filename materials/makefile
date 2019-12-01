@@ -2,6 +2,7 @@
 fac = face.cpp
 dar = darts.cpp
 darH = dartsHough.cpp
+darHO = dartsHoughOld.cpp
 image = dart5.jpg
 
 # FLAGS = -I/usr/local/opt/opencv@2/include /usr/local/opt/opencv@2/lib/libopencv_core.2.4.dylib /usr/local/opt/opencv@2/lib/libopencv_highgui.2.4.dylib
@@ -21,6 +22,10 @@ face: ${fac}
 darts: ${dar}
 	${CC} ${dar} -o darts
 	./darts ${image}
+
+dartsHO: ${darHO}
+	${CC} ${darHO} -o dartsHoughO
+	./dartsHoughO ${image}
 
 dartsH: ${darH}
 	${CC} ${darH} -o dartsHough
