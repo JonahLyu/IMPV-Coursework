@@ -151,8 +151,8 @@ int main( int argc, const char** argv )
 			found.y += darts[i].y;
 			cout << found << endl;
 			accepted.push_back(found); //Store found as confident dartboard
-			circle(out, Point(board.first.x+darts[i].x, board.first.y+darts[i].y), board.first.r, Scalar(0, 255, 0), 2);
-			circle(out, Point(board.second.x+darts[i].x, board.second.y+darts[i].y), board.second.r, Scalar(0, 255, 0), 2);
+			circle(out, Point(board.first.x+darts[i].x, board.first.y+darts[i].y), board.first.r, Scalar(255, 0, 0), 2);
+			circle(out, Point(board.second.x+darts[i].x, board.second.y+darts[i].y), board.second.r, Scalar(255, 0, 0), 2);
 			//Draw lines
             for (int j = 0; j < lines.size(); j++) {
                 drawLine(out, lines[j].rho, lines[j].a, lines[j].b, darts[i], Point(board.first.x, board.first.y), found.width);
@@ -162,8 +162,9 @@ int main( int argc, const char** argv )
 	}
 
 	for (int i = 0; i < accepted.size(); i++) { //Add accepted frames
-		rectangle(out, Point(accepted[i].x, accepted[i].y), Point(accepted[i].x + accepted[i].width, accepted[i].y + accepted[i].height), Scalar( 255, 0, 0 ), 2);
+		rectangle(out, Point(accepted[i].x, accepted[i].y), Point(accepted[i].x + accepted[i].width, accepted[i].y + accepted[i].height), Scalar( 0, 255, 0 ), 2);
 	}
+	groundTruthDraw(out, gt);
 	imwrite(s, out);
 	int truePos = 0;
 	int frameCount = gt.size();
@@ -391,7 +392,6 @@ vector<Rect> getTruths(int index) {
 	gt[10].push_back(Rect(578, 127, 67, 89));
 	gt[10].push_back(Rect(91, 103, 103, 115));
 	gt[11].push_back(Rect(161, 98, 82, 81));
-	gt[11].push_back(Rect(436, 111, 53, 77)); //Maybe too hidden to expect detection
 	gt[12].push_back(Rect(154, 72, 66, 146));
 	gt[13].push_back(Rect(269, 119, 139, 136));
 	gt[14].push_back(Rect(114, 98, 139, 132));

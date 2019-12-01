@@ -232,8 +232,8 @@ void acceptReject(Mat image, vector<Rect> darts, vector<Rect> gt, String s) {
 			found.y += darts[i].y;
 			cout << found << endl;
 			accepted.push_back(found); //Store found as confident dartboard
-			circle(out, Point(board.first.x+darts[i].x, board.first.y+darts[i].y), board.first.r, Scalar(0, 255, 0), 2);
-			circle(out, Point(board.second.x+darts[i].x, board.second.y+darts[i].y), board.second.r, Scalar(0, 255, 0), 2);
+			circle(out, Point(board.first.x+darts[i].x, board.first.y+darts[i].y), board.first.r, Scalar(255, 0, 0), 2);
+			circle(out, Point(board.second.x+darts[i].x, board.second.y+darts[i].y), board.second.r, Scalar(255, 0, 0), 2);
 			//Draw lines
             for (int j = 0; j < lines.size(); j++) {
                 drawLine(out, lines[j].rho, lines[j].a, lines[j].b, darts[i], Point(board.first.x, board.first.y), found.width);
@@ -273,7 +273,7 @@ void acceptReject(Mat image, vector<Rect> darts, vector<Rect> gt, String s) {
 	// lineMain(image, ang, mag, Rect(0,0,image.cols,image.rows));
 	// circleMain(image, ang, mag, Rect(0,0,image.cols,image.rows));
 	for (int i = 0; i < accepted.size(); i++) { //Add accepted frames
-		rectangle(out, Point(accepted[i].x, accepted[i].y), Point(accepted[i].x + accepted[i].width, accepted[i].y + accepted[i].height), Scalar( 255, 0, 0 ), 2);
+		rectangle(out, Point(accepted[i].x, accepted[i].y), Point(accepted[i].x + accepted[i].width, accepted[i].y + accepted[i].height), Scalar( 0, 255, 0 ), 2);
 	}
 	groundTruthDraw(out, gt);
 	imwrite(s, out);
