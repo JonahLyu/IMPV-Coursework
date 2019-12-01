@@ -14,6 +14,7 @@ CC = g++ ${O_LIBS} ${FLAGS} -std=c++11
 
 face: ${fac}
 	${CC} ${fac} -o face
+	./face ${image}
 
 darts: ${dar}
 	${CC} ${dar} -o darts
@@ -40,4 +41,3 @@ runAll:
 	./dartsHough dart13.jpg
 	./dartsHough dart14.jpg
 	./dartsHough dart15.jpg
-
