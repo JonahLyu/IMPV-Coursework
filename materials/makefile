@@ -30,7 +30,8 @@ dartsHS: ${darHS}
 	${CC} ${darHS} -o dartsHoughS
 	./dartsHoughS ${image}
 
-runAll:
+runAll: ${darH}
+	${CC} ${darH} -o dartsHough
 	./dartsHough dart0.jpg
 	./dartsHough dart1.jpg
 	./dartsHough dart2.jpg

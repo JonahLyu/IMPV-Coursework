@@ -44,6 +44,7 @@ bool checkClosePoints(Rect frame, vector<Point> iPoints, int around, int minClos
 int pullNum(const char* name);
 bool rectIntersect(Rect r1, Rect r2, double thresh);
 vector<Rect> getTruths( int index );
+void detectStats(vector<Rect> gt, vector<Rect> detected);
 vector<Rect> detectAndDisplay( Mat frame, vector<Rect> gt );
 void groundTruthDraw(Mat frame, vector<Rect> gt);
 vector<Rect> getGT(const char* name);
@@ -92,7 +93,6 @@ int main( int argc, const char** argv )
 
 	// 2. Load the Strong Classifier in a structure called `Cascade'
 	if( !cascade.load( cascade_name ) ){ printf("--(!)Error loading\n"); return -1; };
-
 	// 3. Detect Faces and Display Result
 	vector<Rect> darts = detectAndDisplay( frame, gt );
 
@@ -192,11 +192,40 @@ int main( int argc, const char** argv )
 			accepted.push_back(potential[i]);
 		}
 	}
-
+	// lineMain(image, ang, mag, Rect(0,0,image.cols,image.rows));
+	// circleMain(image, ang, mag, Rect(0,0,image.cols,image.rows));
 	for (int i = 0; i < accepted.size(); i++) { //Add accepted frames
 		rectangle(out, Point(accepted[i].x, accepted[i].y), Point(accepted[i].x + accepted[i].width, accepted[i].y + accepted[i].height), Scalar( 255, 0, 0 ), 2);
 	}
 	imwrite(s, out);
+
+	detectStats(gt, accepted);
+	// int truePos = 0;
+	// int frameCount = accepted.size();
+	// for( int i = 0; i < accepted.size(); i++ ) //Exit loop early when all ground truths seen
+	// {
+	// 	bool matchFlag = false;
+	// 	rectangle(frame, Point(accepted[i].x, accepted[i].y), Point(accepted[i].x + accepted[i].width, accepted[i].y + accepted[i].height), Scalar( 0, 255, 0 ), 2);
+	// 	for (int j = 0; j < gt.size(); j++) {
+	// 		if (rectIntersect(accepted[i], gt[j], 0.75)) {
+	// 			gt.erase(gt.begin() + j);
+	// 			matchFlag = true;
+	// 			break;
+	// 		}
+	// 	}
+	// 	if (matchFlag) {
+	// 		// cout << "Detected face " << i+1 << " " << faces[i] << " closely matches ground truth" << endl;
+	// 		truePos++;
+	// 	}
+	// 	else cout << "Detected face " << i+1 << " " << accepted[i]  << "doesn't match a ground truth face" << endl;
+	// }
+	// float prec = (float) truePos/ accepted.size(); //ratio of faces found correctly, to faces detected in image
+	// float recall = (frameCount > 0 ? (float) truePos/frameCount : 1); //True positive rate
+	// float f1 = 2 * ((prec * recall) / (prec + recall)); //Measure of accuracy of classifier
+	// f1 = (f1 != f1) ? 0 : f1; //f1 != f1 is true if f1 is NaN, as long as -ffast-math compiler flag not used
+	// cout << truePos << " faces out of " << frameCount << " detected correctly." << endl;
+	// cout << "True positive rate = " <<  recall << endl;
+	// cout << "F1 score = " << f1 << endl;
     return 0;
 }
 
@@ -236,6 +265,12 @@ vector< lineS > lineMain(Mat image, Mat &ang, Mat &mag, Rect pos) {
     suppressLine(hspaceLine, 0.5, 10*precision, supHLine);  //do suppression for the line hough space with 0.5 bound
     vector< lineS > lines;
     lines = getLines(supHLine);  //get all lines of this frame
+
+	Mat hough_norm;
+	normalize(hspaceLine, hough_norm, 0, 255, NORM_MINMAX);
+
+	imwrite("hough_line.jpg", hough_norm);
+
 	return lines;
 }
 
@@ -250,9 +285,20 @@ vector<circ> circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
 	int dims[3] = {ang.rows, ang.cols, radius};
 	Mat hspace = Mat(3, dims, CV_64F, Scalar(0));
 	houghCircle(output_thresholded, ang, radius, hspace); //Have create 3d hough mat
+
+	Mat output_hough;
+	output_hough.create(ang.size(), ang.type());
+	houghToMat(hspace, output_hough, radius);
+	
 	Mat supH;
 	vector< circ > circs;
 	circs = suppressCircles(hspace, 0.5, ang.cols, ang.rows, radius, 15, supH); //Suppress 3d hough mat
+
+	normalize(output_hough, output_hough, 0, 255, NORM_MINMAX);
+
+	imwrite("circle_thresh.jpg", output_thresholded);
+	imwrite("hough_circle.jpg", output_hough);
+
 	return circs;
 }
 
@@ -414,13 +460,41 @@ void groundTruthDraw(Mat frame, vector<Rect> gt) {
 	}
 }
 
+void detectStats(vector<Rect> gt, vector<Rect> detected) {
+	int truePos = 0;
+	int frameCount = gt.size();
+	for( int i = 0; i < detected.size(); i++ ) //Exit loop early when all ground truths seen
+	{
+		bool matchFlag = false;
+		for (int j = 0; j < gt.size(); j++) {
+			if (rectIntersect(detected[i], gt[j], 0.75)) {
+				gt.erase(gt.begin() + j);
+				matchFlag = true;
+				break;
+			}
+		}
+		if (matchFlag) {
+			// cout << "Detected face " << i+1 << " " << faces[i] << " closely matches ground truth" << endl;
+			truePos++;
+		}
+		else cout << "Detected face " << i+1 << " " << detected[i]  << "doesn't match a ground truth face" << endl;
+	}
+	float prec = (float) truePos / detected.size(); //ratio of faces found correctly, to faces detected in image
+	float recall = (frameCount > 0 ? (float) truePos/frameCount : 1); //True positive rate
+	float f1 = 2 * ((prec * recall) / (prec + recall)); //Measure of accuracy of classifier
+	f1 = (f1 != f1) ? 0 : f1; //f1 != f1 is true if f1 is NaN, as long as -ffast-math compiler flag not used
+	cout << truePos << " faces out of " << frameCount << " detected correctly." << endl;
+	cout << "True positive rate = " <<  recall << endl;
+	cout << "F1 score = " << f1 << endl;
+}
+
 /** @function detectAndDisplay */
 vector<Rect> detectAndDisplay( Mat frame , vector<Rect> gt)
 {
 	std::vector<Rect> darts;
 	Mat frame_gray;
-	int truePos = 0;
-	int dartCount = gt.size();
+	// int truePos = 0;
+	// int dartCount = gt.size();
 
 	// 1. Prepare Image by turning it into Grayscale and normalising lighting
 	cvtColor( frame, frame_gray, CV_BGR2GRAY );
@@ -432,31 +506,33 @@ vector<Rect> detectAndDisplay( Mat frame , vector<Rect> gt)
        // 3. Print number of Faces found
 	std::cout << darts.size() << std::endl;
 
-       // 4. Draw box around faces found
-	for( int i = 0; i < darts.size(); i++ ) //Exit loop early when all ground truths seen
-	{
-		bool matchFlag = false;
-		rectangle(frame, Point(darts[i].x, darts[i].y), Point(darts[i].x + darts[i].width, darts[i].y + darts[i].height), Scalar( 0, 255, 0 ), 2);
-		for (int j = 0; j < gt.size(); j++) {
-			if (rectIntersect(darts[i], gt[j], 0.75)) {
-				gt.erase(gt.begin() + j);
-				matchFlag = true;
-				break;
-			}
-		}
-		if (matchFlag) {
-			// cout << "Detected face " << i+1 << " " << faces[i] << " closely matches ground truth" << endl;
-			truePos++;
-		}
-		else cout << "Detected face " << i+1 << " " << darts[i]  << "doesn't match a ground truth face" << endl;
-	}
-	float prec = (float) truePos/ darts.size(); //ratio of faces found correctly, to faces detected in image
-	float recall = (dartCount > 0 ? (float) truePos/dartCount : 1); //True positive rate
-	float f1 = 2 * ((prec * recall) / (prec + recall)); //Measure of accuracy of classifier
-	f1 = (f1 != f1) ? 0 : f1; //f1 != f1 is true if f1 is NaN, as long as -ffast-math compiler flag not used
-	cout << truePos << " faces out of " << dartCount << " detected correctly." << endl;
-	cout << "True positive rate = " <<  recall << endl;
-	cout << "F1 score = " << f1 << endl;
+    //    4. Draw box around faces found
+	for (int i = 0; i < darts.size(); i++) rectangle(frame, Point(darts[i].x, darts[i].y), Point(darts[i].x + darts[i].width, darts[i].y + darts[i].height), Scalar( 0, 255, 0 ), 2);
+	detectStats(gt, darts);
+	// for( int i = 0; i < darts.size(); i++ ) //Exit loop early when all ground truths seen
+	// {
+	// 	bool matchFlag = false;
+	// 	rectangle(frame, Point(darts[i].x, darts[i].y), Point(darts[i].x + darts[i].width, darts[i].y + darts[i].height), Scalar( 0, 255, 0 ), 2);
+	// 	for (int j = 0; j < gt.size(); j++) {
+	// 		if (rectIntersect(darts[i], gt[j], 0.75)) {
+	// 			gt.erase(gt.begin() + j);
+	// 			matchFlag = true;
+	// 			break;
+	// 		}
+	// 	}
+	// 	if (matchFlag) {
+	// 		// cout << "Detected face " << i+1 << " " << faces[i] << " closely matches ground truth" << endl;
+	// 		truePos++;
+	// 	}
+	// 	else cout << "Detected face " << i+1 << " " << darts[i]  << "doesn't match a ground truth face" << endl;
+	// }
+	// float prec = (float) truePos/ darts.size(); //ratio of faces found correctly, to faces detected in image
+	// float recall = (dartCount > 0 ? (float) truePos/dartCount : 1); //True positive rate
+	// float f1 = 2 * ((prec * recall) / (prec + recall)); //Measure of accuracy of classifier
+	// f1 = (f1 != f1) ? 0 : f1; //f1 != f1 is true if f1 is NaN, as long as -ffast-math compiler flag not used
+	// cout << truePos << " faces out of " << dartCount << " detected correctly." << endl;
+	// cout << "True positive rate = " <<  recall << endl;
+	// cout << "F1 score = " << f1 << endl;
 	return darts;
 }
 
