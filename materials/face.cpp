@@ -39,11 +39,22 @@ int main( int argc, const char** argv )
 	vector<Rect> gTs;
 
 	//Getting correct ground truths for loaded image
-	if (!strcmp(argv[1], "dart4.jpg")) gTs = getTruths(0);
-	else if (!strcmp(argv[1], "dart5.jpg")) gTs = getTruths(1);
-	else if (!strcmp(argv[1], "dart13.jpg")) gTs = getTruths(2);
-	else if (!strcmp(argv[1], "dart14.jpg")) gTs = getTruths(3);
-	else if (!strcmp(argv[1], "dart15.jpg")) gTs = getTruths(4);
+	if (!strcmp(argv[1], "dart0.jpg")) gTs = getTruths(0);
+	else if (!strcmp(argv[1], "dart1.jpg")) gTs = getTruths(1);
+	else if (!strcmp(argv[1], "dart2.jpg")) gTs = getTruths(2);
+	else if (!strcmp(argv[1], "dart3.jpg")) gTs = getTruths(3);
+	else if (!strcmp(argv[1], "dart4.jpg")) gTs = getTruths(4);
+	else if (!strcmp(argv[1], "dart5.jpg")) gTs = getTruths(5);
+	else if (!strcmp(argv[1], "dart6.jpg")) gTs = getTruths(6);
+	else if (!strcmp(argv[1], "dart7.jpg")) gTs = getTruths(7);
+	else if (!strcmp(argv[1], "dart8.jpg")) gTs = getTruths(8);
+	else if (!strcmp(argv[1], "dart9.jpg")) gTs = getTruths(9);
+	else if (!strcmp(argv[1], "dart10.jpg")) gTs = getTruths(10);
+	else if (!strcmp(argv[1], "dart11.jpg")) gTs = getTruths(11);
+	else if (!strcmp(argv[1], "dart12.jpg")) gTs = getTruths(12);
+	else if (!strcmp(argv[1], "dart13.jpg")) gTs = getTruths(13);
+	else if (!strcmp(argv[1], "dart14.jpg")) gTs = getTruths(14);
+	else if (!strcmp(argv[1], "dart15.jpg")) gTs = getTruths(15);
 
 	// 2. Load the Strong Classifier in a structure called `Cascade'
 	if( !cascade.load( cascade_name ) ){ printf("--(!)Error loading\n"); return -1; };
@@ -73,28 +84,35 @@ bool rectIntersect(Rect r1, Rect r2, double thresh) {
 }
 
 vector<Rect> getTruths(int index) {
-	vector< vector<Rect> > gTs(5);
+	vector< vector<Rect> > gTs(16);
 	//Adding ground truth location of faces for each image
 	//Indexes:
 	//	0 = dart4.jpg, 1 = dart5.jpg, 2 = dart13.jpg, 3 = dart14.jpg, 4 = dart15.jpg
-	gTs[0].push_back(Rect(342, 107, 147, 147));
-	gTs[1].push_back(Rect(513, 177, 55, 55));
-	gTs[1].push_back(Rect(641, 184, 59, 59));
-	gTs[1].push_back(Rect(191, 214, 65, 65));
-	gTs[1].push_back(Rect(290, 242, 63, 63));
-	gTs[1].push_back(Rect(425, 231, 68, 68));
-	gTs[1].push_back(Rect(58, 249, 64, 64));
-	gTs[1].push_back(Rect(554, 244, 69, 69));
-	gTs[1].push_back(Rect(673, 246, 64, 64));
-	gTs[1].push_back(Rect(60, 135, 63, 63));
-	gTs[1].push_back(Rect(377, 190, 57, 57));
-	gTs[1].push_back(Rect(250, 164, 57, 57));
-	gTs[2].push_back(Rect(412, 123, 122, 122));
-	gTs[3].push_back(Rect(461, 216, 103, 103));
-	gTs[3].push_back(Rect(726, 189, 100, 100));
-	gTs[4].push_back(Rect(360, 110, 100, 100));
-	gTs[4].push_back(Rect(548, 121, 54, 54));
-	gTs[4].push_back(Rect(65, 123, 86, 86));
+	gTs[0].push_back(Rect(143, 201, 120, 120));
+	gTs[6].push_back(Rect(280, 100, 60, 60));
+	gTs[7].push_back(Rect(327, 185, 101,101));
+	gTs[8].push_back(Rect(140, 270, 83,83));
+	gTs[9].push_back(Rect(75, 198, 137,137));
+	gTs[11].push_back(Rect(328, 76, 61,61));
+
+	gTs[4].push_back(Rect(342, 107, 147, 147));
+	gTs[5].push_back(Rect(513, 177, 55, 55));
+	gTs[5].push_back(Rect(641, 184, 59, 59));
+	gTs[5].push_back(Rect(191, 214, 65, 65));
+	gTs[5].push_back(Rect(290, 242, 63, 63));
+	gTs[5].push_back(Rect(425, 231, 68, 68));
+	gTs[5].push_back(Rect(58, 249, 64, 64));
+	gTs[5].push_back(Rect(554, 244, 69, 69));
+	gTs[5].push_back(Rect(673, 246, 64, 64));
+	gTs[5].push_back(Rect(60, 135, 63, 63));
+	gTs[5].push_back(Rect(377, 190, 57, 57));
+	gTs[5].push_back(Rect(250, 164, 57, 57));
+	gTs[13].push_back(Rect(412, 123, 122, 122));
+	gTs[14].push_back(Rect(461, 216, 103, 103));
+	gTs[14].push_back(Rect(726, 189, 100, 100));
+	gTs[15].push_back(Rect(360, 110, 100, 100));
+	gTs[15].push_back(Rect(548, 121, 54, 80));
+	gTs[15].push_back(Rect(65, 123, 86, 86));
 	for (int j = 0; j < gTs[index].size(); j++) { //Expanding ground truth rect so detected can be seen
 		gTs[index][j].x -= 4;
 		gTs[index][j].y -= 4;
