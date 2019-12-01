@@ -39,6 +39,7 @@ vector<Mat> getFrames(Mat image, vector<Rect> det);
 bool circRatios(circ circs0, circ circs1);
 pair<circ,circ> getCircPair(vector<circ> circs);
 vector< lineS > getValidLines(vector< lineS> lines, pair<circ, circ> board, int &count, vector<Point> &iPoints);
+bool checkClosePoints(Rect frame, vector<Point> iPoints, int around, int minClose, int validWant, Point &mode);
 
 int pullNum(const char* name);
 bool rectIntersect(Rect r1, Rect r2, double thresh);
@@ -318,6 +319,31 @@ vector< lineS > getValidLines(vector<lineS> lines, pair<circ, circ> board, int &
     return out;
 }
 
+bool checkClosePoints(Rect frame, vector<Point> iPoints, int around, int minClose, int validWant, Point &mode) {
+	bool xFlag, yFlag;
+	int countVotes = 0;
+	int validPoints = 0;
+	int maxPoints = validWant-1;
+	for (int i = 0; i < iPoints.size(); i++){
+		countVotes = 0;
+		for (int j = 0; j < iPoints.size(); j++){
+			xFlag = false;
+			yFlag = false;
+			if (i != j){
+				if (iPoints[j].x < (iPoints[i].x + around) && iPoints[j].x > iPoints[i].x - around) xFlag = true;
+				if (iPoints[j].y < (iPoints[i].y + around) && iPoints[j].y > iPoints[i].y - around) yFlag = true;
+				if (xFlag && yFlag) countVotes++;
+			}
+		}
+		if (countVotes >= minClose) validPoints++;
+		if (validPoints > maxPoints) {
+			maxPoints = validPoints;
+			mode = iPoints[i];
+		}
+	}	
+	return validPoints >= validWant;
+}
+
 //
 //
 //
@@ -371,7 +397,10 @@ vector<Rect> getTruths(int index) {
 	gt[14].push_back(Rect(114, 98, 139, 132));
 	gt[14].push_back(Rect(982, 95, 135, 125));
 	gt[15].push_back(Rect(155, 49, 132, 150));
-	if (index < 0 || index > 15) return gt[0];
+	if (index < 0 || index > 15) {
+		gt[16].push_back(Rect(0,0,0,0));
+		return gt[16];
+	}
 	return gt[index];
 }
 

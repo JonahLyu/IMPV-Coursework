@@ -405,7 +405,7 @@ bool rectIntersect(Rect r1, Rect r2, double thresh) {
 }
 
 vector<Rect> getTruths(int index) {
-	vector< vector<Rect> > gt(16);
+	vector< vector<Rect> > gt(17);
 	//Adding ground truth location of faces for each image
 	gt[0].push_back(Rect(452, 17, 150, 179));
 	gt[1].push_back(Rect(193, 134, 201, 191));
@@ -427,7 +427,10 @@ vector<Rect> getTruths(int index) {
 	gt[14].push_back(Rect(114, 98, 139, 132));
 	gt[14].push_back(Rect(982, 95, 135, 125));
 	gt[15].push_back(Rect(155, 49, 132, 150));
-	if (index < 0 || index > 15) return gt[0];
+	if (index < 0 || index > 15) {
+		gt[16].push_back(Rect(0,0,0,0));
+		return gt[16];
+	}
 	return gt[index];
 }
 
