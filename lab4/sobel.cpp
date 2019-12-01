@@ -175,7 +175,7 @@ int main( int argc, char** argv )
 
  Mat image;
  image = imread( imageName, 1 );
- image = image(Rect(193, 102, 88, 85)); //6
+ // image = image(Rect(193, 102, 88, 85)); //6
 
  if( argc != 2 || !image.data )
  {
@@ -243,15 +243,17 @@ int dims[3] = {output_ang.rows, output_ang.cols, radius};
 Mat hspace = Mat(3, dims, CV_64F, Scalar(0));
 // zeroHspace(hspace, dims);
 hough(output_thresholded, output_ang, radius, hspace); //Have create 3d hough mat
+
 Mat output_hough;
 output_hough.create(output_ang.size(), output_ang.type());
+Mat output_hough_norm;
+houghToMat(hspace, output_hough, radius); //Take 3d hough mat to 2d hough mat
+normalize(output_hough, output_hough_norm, 0, 255, NORM_MINMAX);
+imwrite( "output_hough.jpg", output_hough_norm);
+
 Mat supH;
 suppress(hspace, 0.4, output_ang.cols, output_ang.rows, radius, 50, supH); //Suppress 3d hough mat
-houghToMat(supH, output_hough, radius); //Take 3d hough mat to 2d hough mat
-Mat output_hough_norm;
-normalize(output_hough, output_hough_norm, 0, 255, NORM_MINMAX);
 
-imwrite( "output_hough.jpg", output_hough_norm);
 
 Mat output_circles;
 output_circles.create(output_ang.size(), output_ang.type());
