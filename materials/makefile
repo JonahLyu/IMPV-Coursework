@@ -4,7 +4,9 @@ dar = darts.cpp
 darH = dartsHough.cpp
 image = dart5.jpg
 
-FLAGS = -I/usr/local/opt/opencv@2/include /usr/local/opt/opencv@2/lib/libopencv_core.2.4.dylib /usr/local/opt/opencv@2/lib/libopencv_highgui.2.4.dylib
+# FLAGS = -I/usr/local/opt/opencv@2/include /usr/local/opt/opencv@2/lib/libopencv_core.2.4.dylib /usr/local/opt/opencv@2/lib/libopencv_highgui.2.4.dylib
+
+FLAGS = -I/usr/local/opt/opencv@2/include /usr/local/opt/opencv@2/lib/libopencv_core.2.4.dylib /usr/local/opt/opencv@2/lib/libopencv_highgui.2.4.dylib /usr/local/opt/opencv@2/lib/libopencv_nonfree.2.4.dylib
 
 CC = g++ ${O_LIBS} ${FLAGS} -std=c++11
 
@@ -24,6 +26,10 @@ dartsH: ${darH}
 	${CC} ${darH} -o dartsHough
 	./dartsHough ${image}
 
+dartsHS: ${darHS}
+	${CC} ${darHS} -o dartsHoughS
+	./dartsHoughS ${image}
+
 runAll:
 	./dartsHough dart0.jpg
 	./dartsHough dart1.jpg
@@ -41,3 +47,21 @@ runAll:
 	./dartsHough dart13.jpg
 	./dartsHough dart14.jpg
 	./dartsHough dart15.jpg
+
+runAllHS:
+	./dartsHoughS dart0.jpg
+	./dartsHoughS dart1.jpg
+	./dartsHoughS dart2.jpg
+	./dartsHoughS dart3.jpg
+	./dartsHoughS dart4.jpg
+	./dartsHoughS dart5.jpg
+	./dartsHoughS dart6.jpg
+	./dartsHoughS dart7.jpg
+	./dartsHoughS dart8.jpg
+	./dartsHoughS dart9.jpg
+	./dartsHoughS dart10.jpg
+	./dartsHoughS dart11.jpg
+	./dartsHoughS dart12.jpg
+	./dartsHoughS dart13.jpg
+	./dartsHoughS dart14.jpg
+	./dartsHoughS dart15.jpg
