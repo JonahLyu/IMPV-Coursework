@@ -4,12 +4,12 @@ dar = darts.cpp
 darH = dartsHough.cpp
 darHO = dartsHoughOld.cpp
 
-# FLAGS = -I/usr/local/opt/opencv@2/include /usr/local/opt/opencv@2/lib/libopencv_core.2.4.dylib /usr/local/opt/opencv@2/lib/libopencv_highgui.2.4.dylib
+FLAGS = -I/usr/local/opt/opencv@2/include /usr/local/opt/opencv@2/lib/libopencv_core.2.4.dylib /usr/local/opt/opencv@2/lib/libopencv_highgui.2.4.dylib
 
 # FLAGS = -I/usr/local/opt/opencv@2/include /usr/local/opt/opencv@2/lib/libopencv_core.2.4.dylib /usr/local/opt/opencv@2/lib/libopencv_highgui.2.4.dylib /usr/local/opt/opencv@2/lib/libopencv_nonfree.2.4.dylib
 
-# CC = g++ ${O_LIBS} ${FLAGS} -std=c++11
-CC = g++ ${O_LIBS} -std=c++11
+CC = g++ ${O_LIBS} ${FLAGS} -std=c++11
+# CC = g++ ${O_LIBS} -std=c++11
 
 # %: %.cpp
 # 	${CC} ${$@} -o $@
