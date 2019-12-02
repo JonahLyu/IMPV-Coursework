@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////////////////////
 //
-// COMS30121 - face.cpp
+// COMS30121 - dartboard.cpp
 //
 /////////////////////////////////////////////////////////////////////////////
 
@@ -101,7 +101,7 @@ int main( int argc, const char** argv )
 	// 2. Load the Strong Classifier in a structure called `Cascade'
 	if( !cascade.load( cascade_name ) ){ printf("--(!)Error loading\n"); return -1; };
 
-	// 3. Detect Faces and Display Result
+	// 3. Detect dartboards and Display Result
 	vector<Rect> darts = detectAndDisplay( frame, gt );
 
 	// Draw ground truth rectangles on image
@@ -133,7 +133,7 @@ int main( int argc, const char** argv )
 
 	int minHessian = 400; //Minimum output from hessian filter
 	SurfFeatureDetector detector(minHessian); //Creates feature detector
-	
+
 	vector<KeyPoint> keyPointRef, keyPointFrame; //points of interest in images
 	detector.detect(grayRef, keyPointRef); //Gets points of interest from reference image
 
@@ -157,7 +157,7 @@ int main( int argc, const char** argv )
 		if (dupeFlag) continue; //Ignore frame if similar frame already accepted
 		lines = lineMain(image, framesAng[i], framesMag[i], darts[i]); //Get lines found by hough transform
 		if (lines.size() < 5) continue; //Ignore frame if not enough lines present
-		
+
 		iPoints = getAllIntersects(lines); //Gets all points of intersection of provided lines
 
 		//Check if number of intersection points close to each other is sufficient
@@ -190,7 +190,7 @@ int main( int argc, const char** argv )
 			if (goodMatches.size() > 0.5*keyPointRef.size()) potential.push_back(darts[i]);
 			continue;
 		}
-		
+
 		int count = 0; //count of valid lines
 		lines = getValidLines(lines, board, count, iPoints); //Get lines that intersect near the centre of the circle pair
 		if (count > 15) { //If we have enough intersections, and valid circle pair
@@ -399,7 +399,7 @@ bool checkClosePoints(Rect frame, vector<Point> iPoints, int around, int minClos
 			maxPoints = validPoints;
 			mode = iPoints[i];
 		}
-	}	
+	}
 	return validPoints >= validWant;
 }
 
@@ -435,7 +435,7 @@ bool rectIntersect(Rect r1, Rect r2, double thresh) {
 
 vector<Rect> getTruths(int index) {
 	vector< vector<Rect> > gt(16);
-	//Adding ground truth location of faces for each image
+	//Adding ground truth location of dartboards for each image
 	gt[0].push_back(Rect(452, 17, 150, 179));
 	gt[1].push_back(Rect(193, 134, 201, 191));
 	gt[2].push_back(Rect(102, 100, 91, 85));
@@ -482,10 +482,10 @@ vector<Rect> detectAndDisplay( Mat frame , vector<Rect> gt)
 	// 2. Perform Viola-Jones Object Detection
 	cascade.detectMultiScale( frame_gray, darts, 1.1, 1, 0|CV_HAAR_SCALE_IMAGE, Size(50, 50), Size(500,500) );
 
-       // 3. Print number of Faces found
+       // 3. Print number of dartboards found
 	std::cout << darts.size() << std::endl;
 
-       // 4. Draw box around faces found
+       // 4. Draw box around dartboards found
 	for( int i = 0; i < darts.size(); i++ ) //Exit loop early when all ground truths seen
 	{
 		bool matchFlag = false;
@@ -498,16 +498,16 @@ vector<Rect> detectAndDisplay( Mat frame , vector<Rect> gt)
 			}
 		}
 		if (matchFlag) {
-			// cout << "Detected face " << i+1 << " " << faces[i] << " closely matches ground truth" << endl;
+			// cout << "Detected dartboard " << i+1 << " " << dartboards[i] << " closely matches ground truth" << endl;
 			truePos++;
 		}
-		else cout << "Detected face " << i+1 << " " << darts[i]  << "doesn't match a ground truth face" << endl;
+		else cout << "Detected dartboard " << i+1 << " " << darts[i]  << "doesn't match a ground truth dartboard" << endl;
 	}
-	float prec = (float) truePos/ darts.size(); //ratio of faces found correctly, to faces detected in image
+	float prec = (float) truePos/ darts.size(); //ratio of dartboards found correctly, to dartboards detected in image
 	float recall = (dartCount > 0 ? (float) truePos/dartCount : 1); //True positive rate
 	float f1 = 2 * ((prec * recall) / (prec + recall)); //Measure of accuracy of classifier
 	f1 = (f1 != f1) ? 0 : f1; //f1 != f1 is true if f1 is NaN, as long as -ffast-math compiler flag not used
-	cout << truePos << " faces out of " << dartCount << " detected correctly." << endl;
+	cout << truePos << " dartboards out of " << dartCount << " detected correctly." << endl;
 	cout << "True positive rate = " <<  recall << endl;
 	cout << "F1 score = " << f1 << endl;
 	return darts;

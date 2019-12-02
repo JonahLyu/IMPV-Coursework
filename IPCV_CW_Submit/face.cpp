@@ -34,7 +34,6 @@ int main( int argc, const char** argv )
        // 1. Read Input Image
 	Mat frame = imread(argv[1], CV_LOAD_IMAGE_COLOR);
 	String s = argv[1];
-	s = "face_" + s;
 
 	vector<Rect> gTs;
 
@@ -64,7 +63,7 @@ int main( int argc, const char** argv )
 	// Draw ground truth rectangles on image
 	groundTruthDraw(frame, gTs);
 	// 4. Save Result Image
-	imwrite( s, frame );
+	imwrite( "face_detected.jpg", frame );
 
 	return 0;
 }

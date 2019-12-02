@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////////////////////
 //
-// COMS30121 - face.cpp
+// COMS30121 - dartboard.cpp
 //
 /////////////////////////////////////////////////////////////////////////////
 
@@ -94,7 +94,7 @@ int main( int argc, const char** argv )
 
 	// 2. Load the Strong Classifier in a structure called `Cascade'
 	if( !cascade.load( cascade_name ) ){ printf("--(!)Error loading\n"); return -1; };
-	// 3. Detect Faces and Display Result
+	// 3. Detect dartboards and Display Result
 	vector<Rect> darts = detectAndDisplay( frame, gt );
 
 	// Draw ground truth rectangles on image
@@ -169,7 +169,7 @@ vector<circ> circleMain(Mat &image, Mat &ang, Mat &mag, Rect pos) {
 	// normalize(output_hough, output_hough, 0, 255, NORM_MINMAX);
 	// imwrite("circle_thresh.jpg", output_thresholded);
 	// imwrite("hough_circle.jpg", output_hough);
-	
+
 	Mat supH;
 	vector< circ > circs;
 	circs = suppressCircles(hspace, 0.5, ang.cols, ang.rows, radius, 15, supH); //Suppress 3d hough mat
@@ -208,7 +208,7 @@ void acceptReject(Mat image, vector<Rect> darts, vector<Rect> gt, String s) {
 		if (dupeFlag) continue; //Ignore frame if similar frame already accepted
 		lines = lineMain(image, framesAng[i], framesMag[i], darts[i]); //Get lines found by hough transform
 		if (lines.size() < 5) continue; //Ignore frame if not enough lines present
-		
+
 		iPoints = getAllIntersects(lines); //Gets all points of intersection of provided lines
 
 		//Check if number of intersection points close to each other is sufficient
@@ -222,7 +222,7 @@ void acceptReject(Mat image, vector<Rect> darts, vector<Rect> gt, String s) {
 			potential.push_back(darts[i]); //If we have set of close intersection points, store current frame as potential location
 			continue;
 		}
-		
+
 		int count = 0; //count of valid lines
 		lines = getValidLines(lines, board, count, iPoints); //Get lines that intersect near the centre of the circle pair
 		if (count > 15) { //If we have enough intersections, and valid circle pair
@@ -370,7 +370,7 @@ bool checkClosePoints(Rect frame, vector<Point> iPoints, int around, int minClos
 			maxPoints = validPoints;
 			mode = iPoints[i];
 		}
-	}	
+	}
 	return validPoints >= validWant;
 }
 
@@ -406,7 +406,7 @@ bool rectIntersect(Rect r1, Rect r2, double thresh) {
 
 vector<Rect> getTruths(int index) {
 	vector< vector<Rect> > gt(17);
-	//Adding ground truth location of faces for each image
+	//Adding ground truth location of dartboards for each image
 	gt[0].push_back(Rect(452, 17, 150, 179));
 	gt[1].push_back(Rect(193, 134, 201, 191));
 	gt[2].push_back(Rect(102, 100, 91, 85));
@@ -454,16 +454,16 @@ void detectStats(vector<Rect> gt, vector<Rect> detected) {
 			}
 		}
 		if (matchFlag) {
-			// cout << "Detected face " << i+1 << " " << faces[i] << " closely matches ground truth" << endl;
+			// cout << "Detected dartboard " << i+1 << " " << dartboards[i] << " closely matches ground truth" << endl;
 			truePos++;
 		}
-		else cout << "Detected face " << i+1 << " " << detected[i]  << "doesn't match a ground truth face" << endl;
+		else cout << "Detected dartboard " << i+1 << " " << detected[i]  << "doesn't match a ground truth dartboard" << endl;
 	}
-	float prec = (float) truePos / detected.size(); //ratio of faces found correctly, to faces detected in image
+	float prec = (float) truePos / detected.size(); //ratio of dartboards found correctly, to dartboards detected in image
 	float recall = (frameCount > 0 ? (float) truePos/frameCount : 1); //True positive rate
 	float f1 = 2 * ((prec * recall) / (prec + recall)); //Measure of accuracy of classifier
 	f1 = (f1 != f1) ? 0 : f1; //f1 != f1 is true if f1 is NaN, as long as -ffast-math compiler flag not used
-	cout << truePos << " faces out of " << frameCount << " detected correctly." << endl;
+	cout << truePos << " dartboards out of " << frameCount << " detected correctly." << endl;
 	cout << "True positive rate = " <<  recall << endl;
 	cout << "F1 score = " << f1 << endl;
 }
@@ -483,10 +483,10 @@ vector<Rect> detectAndDisplay( Mat frame , vector<Rect> gt)
 	// 2. Perform Viola-Jones Object Detection
 	cascade.detectMultiScale( frame_gray, darts, 1.1, 1, 0|CV_HAAR_SCALE_IMAGE, Size(50, 50), Size(500,500) );
 
-       // 3. Print number of Faces found
+       // 3. Print number of dartboards found
 	std::cout << darts.size() << std::endl;
 
-    //    4. Draw box around faces found
+    //    4. Draw box around dartboards found
 	for (int i = 0; i < darts.size(); i++) rectangle(frame, Point(darts[i].x, darts[i].y), Point(darts[i].x + darts[i].width, darts[i].y + darts[i].height), Scalar( 0, 255, 0 ), 2);
 	detectStats(gt, darts);
 	return darts;

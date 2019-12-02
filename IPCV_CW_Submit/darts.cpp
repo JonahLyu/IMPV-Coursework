@@ -1,6 +1,6 @@
 /////////////////////////////////////////////////////////////////////////////
 //
-// COMS30121 - face.cpp
+// COMS30121 - dartboard.cpp
 //
 /////////////////////////////////////////////////////////////////////////////
 
@@ -47,7 +47,7 @@ int main( int argc, const char** argv )
 	// 2. Load the Strong Classifier in a structure called `Cascade'
 	if( !cascade.load( cascade_name ) ){ printf("--(!)Error loading\n"); return -1; };
 
-	// 3. Detect Faces and Display Result
+	// 3. Detect dartboards and Display Result
 	detectAndDisplay( frame, gt );
 	// Draw ground truth rectangles on image
 	groundTruthDraw(frame, gt);
@@ -103,14 +103,14 @@ vector<Rect> getGT(const char* name) {
 }
 
 bool rectIntersect(Rect r1, Rect r2, double thresh) {
-	//Returns a boolean indicating if the area 
+	//Returns a boolean indicating if the area
 	//shared by both rectangles is greater than the threshold
 	return ((float) (r1 & r2).area()/(r1|r2).area() > thresh);
 }
 
 vector<Rect> getTruths(int index) {
 	vector< vector<Rect> > gt(16);
-	//Adding ground truth location of faces for each image
+	//Adding ground truth location of dartboards for each image
 	gt[0].push_back(Rect(452, 17, 150, 179));
 	gt[1].push_back(Rect(193, 134, 201, 191));
 	gt[2].push_back(Rect(102, 100, 91, 85));
@@ -153,13 +153,13 @@ void detectAndDisplay( Mat frame , vector<Rect> gt)
 	cvtColor( frame, frame_gray, CV_BGR2GRAY );
 	equalizeHist( frame_gray, frame_gray );
 
-	// 2. Perform Viola-Jones Object Detection 
+	// 2. Perform Viola-Jones Object Detection
 	cascade.detectMultiScale( frame_gray, darts, 1.1, 1, 0|CV_HAAR_SCALE_IMAGE, Size(50, 50), Size(500,500) );
 
-       // 3. Print number of Faces found
+       // 3. Print number of dartboards found
 	std::cout << darts.size() << std::endl;
 
-       // 4. Draw box around faces found
+       // 4. Draw box around dartboards found
 	for( int i = 0; i < darts.size(); i++ ) //Exit loop early when all ground truths seen
 	{
 		bool matchFlag = false;
@@ -172,16 +172,16 @@ void detectAndDisplay( Mat frame , vector<Rect> gt)
 			}
 		}
 		if (matchFlag) {
-			// cout << "Detected face " << i+1 << " " << faces[i] << " closely matches ground truth" << endl;
+			// cout << "Detected dartboard " << i+1 << " " << dartboards[i] << " closely matches ground truth" << endl;
 			truePos++;
 		}
-		else cout << "Detected face " << i+1 << " " << darts[i]  << "doesn't match a ground truth face" << endl;
+		else cout << "Detected dartboard " << i+1 << " " << darts[i]  << "doesn't match a ground truth dartboard" << endl;
 	}
-	float precision = (float) truePos/ darts.size(); //ratio of faces found correctly, to faces detected in image
+	float precision = (float) truePos/ darts.size(); //ratio of dartboards found correctly, to dartboards detected in image
 	float recall = (dartCount > 0 ? (float) truePos/dartCount : 1); //True positive rate
 	float f1 = 2 * ((precision * recall) / (precision + recall)); //Measure of accuracy of classifier
 	f1 = (f1 != f1) ? 0 : f1; //f1 != f1 is true if f1 is NaN, as long as -ffast-math compiler flag not used
-	cout << truePos << " faces out of " << dartCount << " detected correctly." << endl;
+	cout << truePos << " dartboards out of " << dartCount << " detected correctly." << endl;
 	cout << "True positive rate = " <<  recall << endl;
 	cout << "F1 score = " << f1 << endl;
 }

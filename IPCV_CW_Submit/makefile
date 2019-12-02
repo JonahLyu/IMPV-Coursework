@@ -1,15 +1,15 @@
-.PHONY : face darts dartsH
+.PHONY : face darts dartsH dartsHO hough
 fac = face.cpp
 dar = darts.cpp
 darH = dartsHough.cpp
 darHO = dartsHoughOld.cpp
-image = dart5.jpg
 
 # FLAGS = -I/usr/local/opt/opencv@2/include /usr/local/opt/opencv@2/lib/libopencv_core.2.4.dylib /usr/local/opt/opencv@2/lib/libopencv_highgui.2.4.dylib
 
-FLAGS = -I/usr/local/opt/opencv@2/include /usr/local/opt/opencv@2/lib/libopencv_core.2.4.dylib /usr/local/opt/opencv@2/lib/libopencv_highgui.2.4.dylib /usr/local/opt/opencv@2/lib/libopencv_nonfree.2.4.dylib
+# FLAGS = -I/usr/local/opt/opencv@2/include /usr/local/opt/opencv@2/lib/libopencv_core.2.4.dylib /usr/local/opt/opencv@2/lib/libopencv_highgui.2.4.dylib /usr/local/opt/opencv@2/lib/libopencv_nonfree.2.4.dylib
 
-CC = g++ ${O_LIBS} ${FLAGS} -std=c++11
+# CC = g++ ${O_LIBS} ${FLAGS} -std=c++11
+CC = g++ ${O_LIBS} -std=c++11
 
 # %: %.cpp
 # 	${CC} ${$@} -o $@
@@ -17,26 +17,20 @@ CC = g++ ${O_LIBS} ${FLAGS} -std=c++11
 
 face: ${fac}
 	${CC} ${fac} -o face
-	./face ${image}
 
 darts: ${dar}
 	${CC} ${dar} -o darts
-	./darts ${image}
 
 dartsHO: ${darHO}
 	${CC} ${darHO} -o dartsHoughO
-	./dartsHoughO ${image}
 
 dartsH: ${darH}
 	${CC} ${darH} -o dartsHough
-	./dartsHough ${image}
 
 dartsHS: ${darHS}
 	${CC} ${darHS} -o dartsHoughS
-	./dartsHoughS ${image}
 
 runAll: ${darH}
-	${CC} ${darH} -o dartsHough
 	./dartsHough dart0.jpg
 	./dartsHough dart1.jpg
 	./dartsHough dart2.jpg
@@ -71,3 +65,6 @@ runAllHS:
 	./dartsHoughS dart13.jpg
 	./dartsHoughS dart14.jpg
 	./dartsHoughS dart15.jpg
+
+hough:
+	${CC} hough.cpp -o hough
